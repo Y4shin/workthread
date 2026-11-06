@@ -2,7 +2,7 @@
 
 A self-contained description of the intended v1 product, written so that a new team can implement it on any technology stack from this document alone.
 
-**Status:** Implementable draft. Sections 1 through 8 describe the intended product. Section 9 records product decisions that the current product definition does not settle. Those decisions MUST be resolved before the specification can be called complete.
+**Status:** Implementable draft. Sections 1 through 6 and Section 8 describe the intended v1 product, with v2 advisory material clearly marked. Sections 7 and 10 are v2 advisory and are not binding on v1. Section 9 records product decisions that the current product definition does not settle. Those decisions MUST be resolved before the specification can be called complete.
 
 ## How to read this document
 
@@ -10,8 +10,10 @@ A self-contained description of the intended v1 product, written so that a new t
 - Section 3 defines the vocabulary and the state model.
 - Section 4 is the main body: actors, goals, interactions, outcomes, failure paths, and acceptance scenarios.
 - Section 5 defines the shared rules that every story depends on.
-- Sections 6 through 8 define the service architecture, tracker integration, and quality expectations.
+- Sections 6 and 8 define the service architecture, data behavior, and quality expectations.
+- Section 7 is v2 advisory tracker integration. It is retained for context and is not a v1 requirement.
 - Section 9 lists unresolved product decisions with alternatives and consequences.
+- Section 10 covers v2 advisory daily routines and future server hosting. It is not a v1 requirement.
 
 **Normative language.** The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD NOT, RECOMMENDED, MAY, and OPTIONAL in this document are to be interpreted as described in RFC 2119. They are capitalized when used as normative keywords. Lowercase words, including "can", "cannot", "may", "should", "required", "recommended", and "optional", are ordinary prose. In particular, "can" describes a user capability and is not an RFC 2119 keyword.
 
@@ -21,47 +23,61 @@ A self-contained description of the intended v1 product, written so that a new t
 
 ### 1.1 The question the product answers
 
-Itinerary Planner is a local-first desktop application for a person who has committed to more work than they have time for. It continuously answers two questions:
+Itinerary Planner is a local-first application for a developer who accumulates many small commitments, review requests, feature ideas, and follow-ups. These items are often too small, too uncertain, or too interruptive to capture in a ticketing system at the moment they arrive. The product gives them one fast place to land, keeps them visible, and turns them into an automatically ordered plan.
 
-1. Given everything I have committed to, what should I work on now?
-2. Which deadlines are becoming unsafe?
+The product is also a planning layer over work that already lives in a ticketing system. In v1, a task can carry lightweight source metadata that points to the external item, so the user can see that the work is tracked elsewhere. Read-only tracker context that reflects external items more richly is a v2 advisory capability in Section 7.
 
-The application is not a generic to-do list. It turns tasks, projects, estimates, dependencies, deadlines, priorities, logged work, and recurring weekly availability into two products:
+The primary question is:
 
-- An **itinerary**: an ordered, capacity-constrained projection of work.
-- A set of **deadline forecasts and warnings**: an explanation of which commitments can still be met, which are tight, which are already infeasible, and why.
+1. What should I work on now?
 
-Every time the user or an agent changes work, time, capacity, or constraints, the itinerary and the forecasts are recomputed.
+Supporting questions are:
+
+2. What have I captured that I might otherwise lose?
+3. Which deadlines are becoming unsafe?
+
+The itinerary is the primary product. Forecasts and warnings are a secondary, supporting view. The product turns tasks, projects, estimates, dependencies, deadlines, priorities, logged work, and recurring availability into:
+
+- An **itinerary**: an automatically ordered, capacity-constrained projection of work. The user tells the system what the work is and what properties it has. The system owns the order and the plan. The user does not maintain a separate schedule.
+- **Supporting forecasts and warnings**: a secondary explanation of which commitments can still be met, which are tight, which are already infeasible, and why.
+
+Every time the user or an agent changes work, time, capacity, or constraints, the itinerary and the supporting forecasts are recomputed.
 
 ### 1.2 Intended users
 
-**Primary user.** An independent worker who manages several active projects and often receives or completes work through coding agents. They need a credible plan for the rest of the day, early warning when a deadline will no longer be met, and a way for agents to update work without creating a second, conflicting plan.
+**Primary user.** A regular developer at a company who manages several active projects and receives work from colleagues, reviews, bug reports, feature ideas, and personal follow-ups. Work often arrives as "please review this" or "we should add this" at a moment when acting on it would interrupt the current task. The user needs one-step capture, reliable visibility, and an automatically ordered plan. The user is not necessarily an independent worker or a full-time planner.
 
-**Agent user.** A local MCP (Model Context Protocol) client acting on the user's behalf. Agents are first-class users for reading planning state and for making explicit, targeted changes. They are not autonomous schedulers: the application's rules decide the itinerary, and agents invoke the same operations as the human user.
+**Agent user.** A local MCP client acting on the user's behalf. Agents are first-class users for reading planning state and for making explicit, targeted changes. An agent MAY perform a manual override or a scheduling input edit on the user's behalf when the user asks for it. Agents are not autonomous schedulers: the application's rules decide the itinerary by default, and agents MUST NOT make arbitrary, implicit, or unattributed changes.
 
 **Not the intended user.** A team, manager, or organization allocating work across people; a user who wants a collaborative board, chat, cloud workspace, or calendar client; a user who wants the application to make unrequested scheduling decisions with AI.
 
 ### 1.3 Product principles
 
-**P1. Deterministic and explainable.** The same inputs, current time, timezone, and horizon MUST produce the same itinerary. Every scheduled item MUST explain why it was selected. The scheduler MUST NOT be an opaque optimizer.
+**P1. Automatic, deterministic, and explainable ordering.** The user supplies what the work is and what properties it has. The system decides the order. The same inputs, current time, timezone, and horizon MUST produce the same itinerary. Every scheduled item MUST explain why it was selected. The scheduler MUST NOT be an opaque optimizer, and the user MUST NOT have to maintain the itinerary by hand.
 
-**P2. Dependencies are inviolable.** A task MUST NOT be scheduled before its incomplete prerequisites. The dependency graph is a hard constraint, not a preference.
+**P2. Dependencies are protected by default.** A task MUST NOT be scheduled before its incomplete prerequisites by default. The dependency graph is a hard constraint unless the user makes an explicit, recorded override under P9.
 
-**P3. Deadline safety outranks ordinary priority.** Work that protects a feasible deadline MUST come before less urgent work with a higher ordinary priority. Priority breaks ties after deadline and dependency pressure.
+**P3. Deadline safety outranks ordinary priority.** When forecasts are used, work that protects a feasible deadline MUST come before less urgent work with a higher ordinary priority. Priority breaks ties after deadline and dependency pressure. The itinerary remains useful when no deadlines exist.
 
 **P4. Actual work is authoritative.** Logged time, revised estimates, completion, and blocking change future projections immediately. Historical logs remain editable. An estimate overrun is reported, not silently absorbed by changing the estimate.
 
 **P5. One source of truth.** The desktop interface, the tray popup, and the agent interface all use the same planning rules and the same authoritative local data. A surface MUST NOT compute its own schedule or keep a divergent plan.
 
-**P6. Local first and offline capable.** All planning data is stored on the user's computer. The core product works without an account, sign-in, or network connection. Optional tracker integrations MAY use the network but are never required.
+**P6. Local first and offline capable.** All planning data is stored on the user's computer. The core product works without an account, sign-in, or network connection. v1 supports both a local daemon mode and a single-process mode. A server-hosted daemon reachable over a network is a future possibility, not a v1 requirement.
 
-**P7. Agents are first-class but constrained.** Agents can read and write work through a local MCP interface. Changes use explicit identifiers; they MUST NOT use fuzzy targets or implicit batches. Destructive actions and out-of-order completion require explicit confirmation.
+**P7. Agents are first-class but constrained.** Agents can read and write work through a local MCP interface. They can perform explicit manual overrides and scheduling input edits on the user's behalf. Changes use explicit identifiers; they MUST NOT use fuzzy targets or implicit batches. Destructive actions, out-of-order completion, and rule overrides require explicit confirmation. Every agent change is attributable to the requesting user.
 
 **P8. Small, focused surface.** The first release is a focused planning workflow, not a project-management suite. It does not include boards, chats, collaboration, cloud sync, calendar synchronization, or dozens of workflow states.
 
+**P9. Rules are enforced by default, but they do not stand in the way.** Default behavior follows the product rules. When a rule blocks something the user genuinely needs to do, the application MUST offer an explicit override that is reachable without too much trouble and is never the default or obvious choice. An override explains the rule and its consequence, requires confirmation, is recorded, and remains visible. Overrides MAY relax dependency order, capacity for the current day, or the system-owned order, but they MUST NOT schedule an inbox task, a task without a positive estimate, or a task in a paused, completed, or archived project, and they MUST NOT weaken security, data integrity, or another person's data.
+
+**P10. The application does not get in the way.** Using the app SHOULD make life easier, not harder. Common use cases MUST be fast and reachable with few steps. Where it is safe, the application MAY help proactively, for example by suggesting a missing estimate or offering to capture a task, but it MUST NOT change task properties or data without a request.
+
+**P11. The itinerary comes first; forecasts support it.** The itinerary is the main product. Forecasts, risk values, and warnings MUST support the itinerary and MUST NOT be presented as an equal or competing product.
+
 ### 1.4 What the product is not
 
-It is not a calendar, a billing or time-invoicing tool, a team resource planner, a kanban board, a Gantt chart, a chat application, or an autonomous AI project manager. It does not replace an external issue tracker; it can attach external context to local tasks but does not mirror or write to the tracker.
+It is not a calendar, a billing or time-invoicing tool, a team resource planner, a kanban board, a Gantt chart, a chat application, or an autonomous AI project manager. It does not replace an external issue tracker. In v1 it does not write to a tracker. Read-only tracker context is a v2 advisory capability. A server-hosted multi-user service is not part of v1.
 
 ---
 
@@ -69,56 +85,66 @@ It is not a calendar, a billing or time-invoicing tool, a team resource planner,
 
 ### 2.1 Capabilities in v1
 
+- Quick capture of small tasks with only a title, so that an idea, review request, or follow-up can be recorded without interrupting the current task and without requiring a project, estimate, or deadline.
 - Projects with title, priority, optional deadline, and status.
 - Tasks with title, optional description and project, priority, estimate, optional deadline, source metadata, status, and dependencies.
-- An inbox for tasks that are not ready to schedule, including tasks without an estimate.
-- Dependencies with self-edge, duplicate, and cycle prevention, including a displayed cycle path.
+- An inbox for captured tasks that are not ready to schedule, including tasks without an estimate.
+- Automatic ordering by the system. The user supplies task properties and does not maintain a separate schedule or manually sort the itinerary.
+- Dependencies with self-edge, duplicate, and cycle prevention, including a displayed cycle path. A self-edge is a dependency in which a task is its own predecessor; it is invalid because it can never be satisfied.
 - Derived blocking from incomplete prerequisites, without allowing users or agents to set a blocked status directly.
-- Recurring weekly working availability with zero or more intervals per weekday.
+- Explicit, confirmed, recorded overrides for rule-blocked actions, limited to dependency order, capacity for the current day, and system-owned order. Overrides relax those constraints but never schedule an inbox task, a task without an estimate, or a task in a paused, completed, or archived project, and never weaken security or data integrity.
+- Recurring weekly working availability with zero or more intervals per weekday. Each interval includes a pause budget in minutes.
 - Date-specific availability exceptions: a full day off, or replacement intervals for one date.
 - A configured local timezone and a configurable planning horizon.
-- A deterministic, capacity-constrained itinerary with deadline and dependency pressure.
+- A deterministic, capacity-constrained itinerary that subtracts pause budgets from available capacity and is ordered by deadline and dependency pressure.
 - Per-item machine-readable reasons and human-readable explanations.
-- Task and project forecasts with effective deadline, projected finish, slack, risk, and explanation.
+- Supporting task and project forecasts with effective deadline, projected finish, slack, risk, and explanation. Forecasts are secondary to the itinerary.
 - Actionable warnings for tight and missed deadlines, estimate overruns, blocked deadline paths, excess planned work, and missing availability.
+- Operating-system notifications for critical warnings and estimate overruns, plus approaching deadlines once DEC-16 defines that trigger, with user control over which notifications are enabled.
 - One active timer, live elapsed time, and historical time entries that can be added, edited, and deleted.
 - Remaining effort derived from the estimate and logged work, with explicit overrun handling.
 - A desktop interface with Today, Tasks, Projects, Review, and Settings.
 - A tray icon, a compact tray-attached popup, and native tray actions.
-- A local MCP interface for agents with read and write capabilities.
-- Read-only external tracker plugins: discover, configure, search, attach a remote item to a local task, refresh cached metadata, and detach.
+- A local MCP interface for agents with read and write capabilities, explicit overrides and scheduling input edits, and a change feed that reports what changed since a caller-supplied cursor.
+- Two supported service modes in v1: a local daemon that serves an API and an MCP interface to desktop, tray, and agent clients, and a single-process mode in which one process owns the service, desktop window, and tray while MCP is the only external interface.
+- A headless, always-running local service mode, independent of the desktop window, when the daemon mode is used.
 - Local data storage, a visible data location, and an export action.
 - Linux, macOS, and Windows desktop operation.
+
+The itinerary is the primary v1 outcome. Forecasts, deadline risk, and warnings are supporting capabilities. They MUST NOT be treated as an equal or competing release goal.
 
 ### 2.2 Explicit non-goals for v1
 
 - Multi-user collaboration, shared workspaces, accounts, sign-in, or cloud sync.
 - Calendar-provider synchronization, calendar import, or calendar export.
-- Recurring tasks. Recurring weekly availability is a separate concept and does not create recurring task instances.
-- Kanban boards, Gantt charts, timeline drag-and-drop, or manual itinerary reordering.
+- Arbitrary recurring task rules. Daily start and end of workday routines are a v2 advisory candidate in Section 10; arbitrary recurrence is not v1.
+- Kanban boards, Gantt charts, or timeline drag-and-drop.
 - Remote writes to external trackers, mirroring tracker state, or treating a tracker item as authoritative for local planning.
-- Automatic AI scheduling decisions when no agent has explicitly invoked an operation.
+- Automatic AI scheduling decisions when no agent or user has explicitly invoked an operation.
 - Billing, invoicing, cost tracking, or people and resource allocation.
 - Multiple simultaneous timers or parallel-work accounting.
-- Manual schedule pins, protected focus blocks, or user-owned itinerary order.
-- Operating-system notifications or reminders for tightening deadlines. Warnings are shown in the application and tray.
-- Headless or always-running service mode independent of the desktop application.
 - Multi-device conflict resolution.
 - Production third-party tracker integrations as a release prerequisite.
 - Plugin auto-download, a plugin marketplace, or background tracker polling.
 - Encryption, synchronization, import, or recovery capabilities beyond what Section 8 states.
+- A server-hosted daemon reachable over a network. This is a future possibility, not v1.
 
-### 2.3 Deliberately deferred, not promised
+### 2.3 Deferred, not promised
 
-The following ideas are deliberately left open for later consideration but are not v1 requirements and do not form a roadmap: bundled production tracker plugins, multiple active timers, manual pins and focus blocks, recurring tasks, deadline notifications, calendar integration, headless service mode, cloud sync, and multi-device support. A fresh implementation MUST NOT add them in the name of completeness.
+The following ideas are deliberately left open for later consideration but are not v1 requirements: manual itinerary pins, protected focus blocks, a user-owned itinerary order, multiple active timers, arbitrary recurring tasks, calendar integration, cloud sync, multi-device support, server-hosted daemon access, and a plugin marketplace. They do not form a roadmap. A fresh implementation MUST NOT add them in the name of completeness.
 
 ### 2.4 Scope boundaries that are easy to confuse
 
-- **Recurring availability is not a recurring task.** Availability describes when work can happen. It does not create or reset tasks.
-- **A warning is not a notification.** A warning is first-class planning state shown in the interface. v1 does not send operating-system notifications.
+- **Recurring availability is not a recurring task.** Availability describes when work can happen. v1 does not create recurring task instances. A daily routine task anchored to the start or end of the workday is a v2 advisory candidate in Section 10.
+- **A warning is not a notification.** A warning is first-class planning state shown in the interface. A notification is a delivery mechanism. v1 supports both: warnings appear in the application and tray, and enabled notification categories, including critical warnings and estimate overruns, can also produce operating-system notifications.
 - **A task list is not a user-created list.** The product has a Tasks view. It does not have user-created lists, folders, or boards as planning entities. "List" in this specification means a view of tasks.
-- **Tracker context is not synchronization.** An attachment is a local, cached link. It does not make the tracker authoritative and does not write back.
+- **Tracker context is not synchronization.** A v2 attachment is a local, cached link. It does not make the tracker authoritative and does not write back. v1 records only lightweight source metadata.
 - **A forecast is not a guarantee.** It is a projection from current data and current capacity.
+- **An override is not a silent bypass.** An override is explicit, confirmed, recorded, and visible. It does not change the underlying data to pretend the rule was satisfied.
+
+### 2.5 V2 advisory candidates
+
+The following capabilities are described for context but are not v1 requirements: read-only tracker plugins and attachments (Section 7), daily routine tasks anchored to the start or end of a workday (Section 10.1), and a server-hosted daemon reachable over a network (Section 10.2). A v1 implementation is not bound by these sections.
 
 ---
 
@@ -130,28 +156,35 @@ The following ideas are deliberately left open for later consideration but are n
 | --- | --- |
 | **Task** | A unit of work with a title, optional description and project, priority, estimate, optional deadline, source metadata, status, dependencies, and time entries. |
 | **Project** | A grouping of tasks with its own title, priority, optional deadline, and status. A task MAY have no project. |
-| **Inbox** | A holding state for tasks that are not ready to schedule, often because they lack an estimate. Inbox tasks MUST NOT be scheduled. |
+| **Inbox** | A holding state for captured tasks that are not ready to schedule, often because they lack an estimate. Quick capture creates an inbox task. Inbox tasks MUST NOT be scheduled. |
+| **Quick capture** | A one-step action that records a task with only a title, without interrupting the active task or requiring a project, estimate, or deadline. |
+| **Pause budget** | Minutes reserved inside an availability interval for breaks that the user takes without scheduling them in advance. It is subtracted from capacity and is not an itinerary item. The reserve is a planning allowance, not a balance tracked against actual breaks. |
+| **Override** | An explicit, confirmed, recorded exception that lets a user or agent proceed when a planning rule would block an action. An override relaxes one of three constraints: dependency order, capacity for the current day, or system-owned order. It does not weaken security or data integrity. |
+| **Scheduling input edit** | An explicit, validated change to a task's priority, project, estimate, deadline, or source. It changes the inputs the rules use and never sets an allocation, an itinerary position, or a rule exception. |
 | **Estimate** | The planned effort for a task, expressed in minutes. See Section 9, DEC-1, for the unresolved total-versus-remaining question. |
 | **Logged work** | The sum of closed time entries for a task plus the live elapsed time of its active timer. |
-| **Remaining effort** | `max(estimate - logged work, 0)`. An unfinished task with zero remaining effort receives a five-minute completion slot when it is otherwise eligible. |
-| **Dependency** | A directed edge stating that a predecessor task MUST be completed before a successor task can begin. Dependencies are inviolable. |
+| **Remaining effort** | `max(estimate - logged work, 0)`. Only logged work changes it. An unfinished task with zero remaining effort receives a five-minute completion slot when it is otherwise eligible. |
+| **Unallocated effort** | Within one projection, stored remaining effort minus minutes already placed for the task earlier in the same projection. It is derived per projection and never stored. |
+| **Dependency** | A directed edge stating that a predecessor task MUST be completed before a successor task can begin. Dependencies are protected by default and MAY be relaxed only by an explicit override. |
 | **Dependency closure** | For a deliverable, the deliverable plus all unfinished prerequisites, recursively, with each task counted once. |
 | **Deadline** | An absolute instant by which a task or project should be done. It is nullable. |
 | **Effective deadline** | For a task, the earlier of its own deadline and the deadline of its active project. A project's effective deadline is its own deadline. |
-| **Availability** | Recurring weekly working intervals per weekday, plus date-specific exceptions. |
-| **Capacity** | Concrete schedulable intervals after availability, exceptions, elapsed time, and the planning horizon are applied. |
-| **Itinerary** | The ordered projection of task allocations across capacity. It is generated from current data, not an authoritative stored plan. |
-| **Forecast** | For a task or project: effective deadline, projected finish, slack, risk, and explanation. |
+| **Availability** | Recurring weekly working intervals per weekday, plus date-specific exceptions. Each interval has a pause budget. |
+| **Capacity** | Concrete schedulable intervals after availability, exceptions, pause budgets, elapsed time, and the planning horizon are applied. |
+| **Itinerary** | The automatically ordered projection of task allocations across capacity. It is the primary product output, generated from current data, not an authoritative stored plan. |
+| **Forecast** | A supporting view for a task or project: effective deadline, projected finish, slack, risk, and explanation. Forecasts are secondary to the itinerary. |
 | **Deadline risk** | One of `safe`, `tight`, `missed`, `blocked`, or `unscheduled`. |
 | **Warning** | A first-class, automatically resolved condition such as a missed deadline, an estimate overrun, or missing working hours. |
+| **Notification** | A delivery of a selected warning or approaching deadline to the operating system. A notification is not the warning itself and MUST NOT be the only place the warning appears. |
 | **Time entry** | A recorded span of work against a task, with a start, end, positive duration, optional note, and origin (timer, manual entry, or agent). |
-| **Active timer** | The single currently running time entry. Only one may run at a time. |
-| **Attachment** | A local link from a task to a remote tracker item, with cached title, status, URL, and refresh time. Context only. |
-| **Tracker plugin** | A locally installed adapter that lets the application search and fetch items from one configured external tracker, read-only. |
+| **Active timer** | The single currently running time entry. Only one MAY run at a time. |
+| **Attachment (v2 advisory)** | A local link from a task to a remote tracker item, with cached title, status, URL, and refresh time. Context only. Not part of v1. |
+| **Tracker plugin (v2 advisory)** | A locally installed adapter that lets the application search and fetch items from one configured external tracker, read-only. Not part of v1. |
 | **Eligible task** | A task that may be allocated under the eligibility rules in Section 5.3. |
 | **Allocation** | A scheduled block of a task within capacity, with a start, end, duration, reason, and explanation. |
 | **Agent** | A local MCP client acting on the user's behalf. |
-| **Application service** | The single owner of validation, authoritative data, scheduling, forecasting, warnings, and recalculation. |
+| **Change cursor** | An opaque position in the agent-visible change feed. An agent can ask what changed since a cursor instead of re-reading all planning state. |
+| **Application service** | The single owner of validation, authoritative data, scheduling, forecasting, warnings, and recalculation. It runs either as a local daemon or inside the single application process. |
 
 ### 3.2 Task attributes
 
@@ -168,7 +201,8 @@ A task has:
 - A stored status: `inbox`, `ready`, `in_progress`, `completed`, or `cancelled`.
 - A completion timestamp when completed.
 - Creation and update timestamps.
-- Zero or more dependency edges, time entries, and tracker attachments.
+- Zero or more dependency edges and time entries.
+- Tracker attachments and routine metadata are v2 advisory and are not part of the v1 task record.
 
 A task MAY have no project. A task that has a project MUST reference an existing project.
 
@@ -188,15 +222,15 @@ A project is an organizing and deadline-bearing concept. It is not a user-create
 
 ### 3.4 Priority
 
-| Value | Label |
-| --- | --- |
-| 1 | Critical |
-| 2 | High |
-| 3 | Normal |
-| 4 | Low |
-| 5 | Someday |
+| Value | Label | What it means for scheduling | Example |
+| --- | --- | --- | --- |
+| 1 | Critical | Interrupt or move planned work. Delay has a serious, concrete consequence. | Restore a broken checkout while customers are unable to pay. |
+| 2 | High | Protect time for it and move lower-priority work if needed. Delay would materially affect a commitment or block important work. | Approve a design so engineering can start a committed project. |
+| 3 | Normal | Give it a slot in the regular plan. A short delay is manageable. | Draft the next team update. |
+| 4 | Low | Schedule it when higher-priority work is covered. It can roll into a later planning window at little cost. | Clean up outdated tags in the task tracker. |
+| 5 | Optional | Use spare capacity. It is acceptable to leave it unscheduled. | Try a new layout for a dashboard that already works. |
 
-Lower numbers are more important. Priority is a tie-breaker after deadline safety and dependency constraints. A task's own priority takes precedence over its project's priority when both are present. A project's priority is used only as a later tie-breaker for its tasks.
+Lower numbers are more important. Priority is a tie-breaker after deadline safety and dependency constraints. A task's own priority takes precedence over its project's priority when both are present. A project's priority is used only as a later tie-breaker for its tasks. The labels are ordinary product vocabulary, not RFC 2119 keywords. The meanings guide the user and the explanation, but priority never overrides dependencies or deadline pressure.
 
 ### 3.5 Task states and derived blocking
 
@@ -204,15 +238,16 @@ Lower numbers are more important. Priority is a tie-breaker after deadline safet
 | --- | --- | --- |
 | `inbox` | Captured but not ready to schedule. MAY lack an estimate. | Yes |
 | `ready` | Schedulable. Requires a positive estimate. | Yes |
-| `in_progress` | The task the user is currently working on. Requires a positive estimate. At most one task may be in this state. | Yes, through starting work |
+| `in_progress` | The task the user is currently working on. Requires a positive estimate. At most one task MAY be in this state. | Yes, through starting work |
 | `completed` | Done and excluded from future planning. Completion timestamp is recorded. | Yes |
 | `cancelled` | Abandoned and excluded from future planning. Time entries remain. | Yes |
-| `blocked` | Derived state: at least one prerequisite is unfinished. Never set directly by a user or agent. | No |
+| `blocked` | Derived state: at least one prerequisite is unfinished. MUST NOT be set directly by a user or agent. | No |
 
-Blocked is an overlay on the task's stored state. A task can be stored as `ready` or `in_progress` and still be reported as blocked when a prerequisite is unfinished. A blocked task is not actionable and is not selected by the scheduler until its prerequisites are completed or have been allocated to finish first. A task in a paused, completed, or archived project is not blocked in this sense; it is simply ineligible for scheduling while the project is in that state.
+Blocked is an overlay on the task's stored state. A task can be stored as `ready` or `in_progress` and still be reported as blocked when a prerequisite is unfinished. A blocked task is not actionable and is not selected by the scheduler until its prerequisites are completed or have been allocated to finish first. A task in a paused, completed, or archived project is not blocked in this sense; it is simply ineligible for scheduling while the project is in that state. A user or agent MAY force work on a blocked task only through the explicit override rules. The task remains reported as blocked; the override does not pretend that the prerequisite was satisfied.
 
 State rules:
 
+- Quick capture creates an inbox task with only a title.
 - Creating a task without a status creates an inbox task.
 - Moving a task from inbox to ready requires a positive estimate.
 - Starting work moves the task to in progress and makes it the single current task.
@@ -221,16 +256,18 @@ State rules:
 - Completing a task records a completion timestamp. Moving a task out of completed clears the timestamp and makes it plannable again.
 - Cancelling a task excludes it from planning and preserves its time entries. Cancelling the active task stops its timer. A cancelled task can be reopened by changing its status to ready; it then requires a positive estimate and normal eligibility.
 - A completed predecessor satisfies its dependents. A cancelled predecessor does not: its dependents remain blocked until the dependency is removed or the predecessor is completed.
-- Adding a dependency to work already in progress does not stop the user's current timed span, but the task is reported as blocked and the scheduler will not select it again until the prerequisite is satisfied.
+- Adding a dependency to work already in progress does not stop the user's current timed span, but the task is reported as blocked and the scheduler will not select it again until the prerequisite is satisfied, unless the user makes an explicit override.
 
 ### 3.6 Project states
 
-| State | Effect on tasks |
-| --- | --- |
-| `active` | Tasks may be scheduled. The project deadline applies to its unfinished tasks. |
-| `paused` | Tasks are not scheduled. The project is not reactivated automatically. |
-| `completed` | The project contributes no future tasks to the itinerary. |
-| `archived` | The same as completed for planning. The project is kept for history. |
+| State | Meaning | Effect on tasks |
+| --- | --- | --- |
+| `active` | The project is current. | Tasks may be scheduled. The project deadline applies to its unfinished tasks. |
+| `paused` | The project is temporarily set aside. | Tasks are not scheduled. The project is not reactivated automatically. |
+| `completed` | The project's intended work is done. It remains in project history and in exports. | The project contributes no future tasks to the itinerary. Completing a project does not automatically complete its tasks. |
+| `archived` | The project is retired from the active workspace without claiming that its work is complete. It is hidden from the default project list but retained for history and export. | The project contributes no future tasks to the itinerary. An archived project can be reactivated later. |
+
+The practical difference is intent and visibility. Completed means the project's work is done. Archived means the project is set aside, possibly with unfinished work. Both are non-schedulable. Both preserve their tasks and history. A completed project with unfinished tasks can be reopened; an archived project can be reactivated.
 
 Changing a project's status does not delete its tasks and does not stop an active timer; the user or agent stops the timer explicitly. A project deadline change may create a missed forecast. The application MUST report the risk, not reject the change.
 
@@ -244,10 +281,12 @@ This specification does not settle whether a user-entered calendar date means th
 
 Availability has two layers:
 
-1. **Weekly rules:** zero or more local-time intervals for each weekday. For example, Monday 09:00 to 12:30 and 13:30 to 17:30. Intervals MUST end after they start and MUST NOT overlap. v1 interprets each interval within one local day; see DEC-12.
-2. **Date exceptions:** at most one per local date. An `unavailable` exception removes all capacity on that date. A `replace_intervals` exception replaces that date's normal weekly intervals with the exception's intervals. Setting an exception for a date creates or replaces the existing exception.
+1. **Weekly rules:** zero or more local-time intervals for each weekday. For example, Monday 09:00 to 12:30 and 13:30 to 17:30. Each interval has a start, an end, and a pause budget in minutes. Intervals MUST end after they start and MUST NOT overlap. The pause budget MUST be zero or greater and less than the interval duration. A typical lunch break is a 30 to 60 minute pause budget on the day's main interval. v1 interprets each interval within one local day; see DEC-12.
+2. **Date exceptions:** at most one per local date. An `unavailable` exception removes all capacity on that date. A `replace_intervals` exception replaces that date's normal weekly intervals with the exception's intervals. Replacement intervals also have pause budgets. Setting an exception for a date creates or replaces the existing exception.
 
-Capacity is the concrete set of schedulable instants produced by applying the weekly rules and exceptions over the planning horizon, then removing elapsed time. If the current time is inside a working interval, capacity begins now. If it is before the interval, capacity begins at the interval start. If it is after the interval, that interval contributes nothing. Capacity is sorted and merged so the itinerary sees contiguous intervals. Local wall-clock times are authoritative across daylight-saving transitions, so the actual elapsed minutes in an interval reflect the offset change.
+The pause budget is reserved for breaks the user takes without scheduling them in advance. It is not an itinerary item and is not placed at a fixed time. The user decides when to take the break. The itinerary schedules at most the capacity that remains after the reserve, so a break never has to be planned ahead. The reserve is a planning allowance, not a tracked balance: a break shorter than the budget leaves capacity unused, and a break longer than the budget consumes planned work time, so later items slip and may become unscheduled or missed. If the user works through the reserve, the extra time is actual logged work, not an automatic change to the availability configuration.
+
+Capacity is the concrete set of schedulable instants produced by applying the weekly rules and exceptions over the planning horizon, subtracting each interval's pause budget, and then removing elapsed time. If the current time is inside a working interval, capacity begins now and the interval's full pause budget stays reserved. If it is before the interval, capacity begins at the interval start. If it is after the interval, that interval contributes nothing. Capacity is sorted and merged so the itinerary sees contiguous intervals. Local wall-clock times are authoritative across daylight-saving transitions, so the actual elapsed minutes in an interval reflect the offset change. The application displays pause budgets separately from allocated work.
 
 The default planning horizon is 90 calendar days in the configured local timezone. The user can configure a horizon from 7 to 365 calendar days. The itinerary covers the horizon or stops earlier when all eligible work is allocated. Section 9, DEC-5, records the unresolved treatment of deadlines beyond the horizon.
 
@@ -263,11 +302,11 @@ The itinerary is a chronological sequence of allocated work. Each item has:
 
 The itinerary is a projection. It is not the authoritative record of what happened and MUST NOT be edited directly. Completing work, logging time, changing an estimate, changing a deadline, changing a dependency, or changing availability causes a new projection.
 
-The itinerary is grouped by working interval in the Today view. An item MUST NOT extend outside capacity. Work longer than the allocation chunk is split into multiple items. The system owns the order; v1 does not support manual pins or drag reordering.
+The itinerary is grouped by working interval in the Today view. An item MUST NOT extend outside capacity. Work longer than the allocation chunk is split into multiple items. The system owns the order. The user does not maintain the itinerary, and v1 does not support manual pins or drag reordering. An explicit ordering override MAY move a chosen task earlier, including ahead of work already scheduled, or treat it as next; it applies to one action, is recorded and visible, and does not become a hand-maintained plan.
 
 ### 3.10 Forecasts and risk
 
-A forecast describes whether a task or project can finish by its effective deadline, given the dependency closure and the capacity before that deadline. It contains:
+A forecast describes whether a task or project can finish by its effective deadline, given the dependency closure and the capacity before that deadline. Forecasts are a secondary, supporting view. The itinerary remains the primary output when no forecast exists or when the user ignores forecasts. A forecast contains:
 
 - The entity type and identifier.
 - A projected finish instant, or null when no finish can be projected within the horizon.
@@ -302,19 +341,23 @@ Warning types:
 | `no_working_hours` | No working availability is configured, so no credible itinerary can be produced. |
 | `dependency_cycle_prevented` | A dependency change was rejected because it would create a cycle. Its persistence is unresolved; see DEC-9. |
 
-Section 5.13 defines triggers and severity.
+A notification is a delivery of a selected warning or approaching deadline to the operating system. Notifications are subject to user preferences and quiet hours. A notification MUST NOT be the only place a warning appears. The warning remains visible in the application and tray.
+
+Section 5.13 defines warning triggers, severity, and notification behavior.
 
 ### 3.12 Time entries and the active timer
 
 A time entry records actual work against one task. It has a stable identifier, the task, a start instant, an end instant, a duration of positive whole minutes, an optional note, an origin (`timer`, manual entry, or agent), and creation and update timestamps.
 
-While a timer runs, the entry is open: it has no end yet, and its elapsed duration is calculated from the current time. Closing the timer sets the end and duration. At most one entry may be open at a time.
+While a timer runs, the entry is open: it has no end yet, and its elapsed duration is calculated from the current time. Closing the timer sets the end and duration. At most one entry MAY be open at a time.
 
-Manual entries cover past or current work, not future work. A manual entry MUST NOT overlap the active open entry. It MAY overlap a closed entry, but the application MUST report a non-blocking notice, because retrospective logging may intentionally cover parallel work. Parallel-work accounting itself is not a v1 feature.
+Manual entries cover past or current work, not future work. A manual entry MUST NOT overlap the active open entry. It MAY overlap a closed entry, but the application MUST report a non-blocking notice, because retrospective logging may intentionally cover parallel work. Parallel-work accounting itself is not a v1 feature. Pause budget is a planning reserve, not logged work; time spent on a break is not counted as work unless the user logs it explicitly.
 
 Editing or deleting a historical entry changes logged work and therefore remaining effort, the itinerary, forecasts, and warnings. Deleting a time entry is a destructive action and requires explicit confirmation.
 
-### 3.13 External tracker attachments
+### 3.13 External tracker attachments (v2 advisory)
+
+This section is v2 advisory. v1 does not implement attachments or tracker plugins. The content is retained so a future implementation has context.
 
 An attachment links a local task to a remote work item such as an issue, ticket, pull request, or task. It stores the local task, the plugin identity, the remote identity, an optional remote URL, the cached remote title, status, and update time, and the attach and last-refresh times. An attachment requires a remote identity and a title. URL, status, and update time are optional.
 
@@ -322,7 +365,7 @@ An attachment is contextual. The local task remains authoritative for title, est
 
 ### 3.14 Identifiers, time, and ordering
 
-Every task, project, dependency, time entry, availability exception, and attachment has a stable opaque identifier. Users and agents address records by identifier. Display titles are not identifiers and are not guaranteed unique.
+Every task, project, dependency, time entry, availability exception, override, and v2 attachment has a stable opaque identifier. Users and agents address records by identifier. Display titles are not identifiers and are not guaranteed unique. A change cursor identifies a position in the agent-visible change feed.
 
 Stored timestamps are absolute instants. Display uses the configured local timezone. Weekly availability and exception dates are local calendar concepts. The implementation MAY choose the exact representation used by the agent interface; the product requires stable identifiers and unambiguous instants.
 
@@ -331,20 +374,19 @@ Lists and projections MUST have deterministic order. User-facing task and projec
 ---
 
 ## 4. User journeys and capability specifications
-
-Each story below has an actor, a goal, a reason the capability matters, starting conditions, the main interaction, the observable outcome, alternative or failure paths, acceptance scenarios, and the shared rules it uses.
+Each story below has an actor, a goal, a reason the capability matters, starting conditions, the main interaction, the observable outcome, alternative or failure paths, acceptance scenarios, and the shared rules it uses. Stories 4.21 and 4.22 are v2 advisory and are not v1 requirements. All other stories in this section are v1.
 
 ### 4.1 Set up timezone, working hours, and availability exceptions
 
-**Story SETUP-1. Working time.** As a worker, I want to define when I am available and which days are exceptions, so that the itinerary uses my real capacity rather than an invented schedule.
+**Story SETUP-1. Working time.** As a worker, I want to define when I am available, how much break time to reserve, and which days are exceptions, so that the itinerary uses my real capacity rather than an invented schedule.
 
 **Starting conditions.** The application is installed. No account or network connection is required. The user may have no availability configured.
 
-**Main interaction.** In Settings, the user selects a local timezone, then defines zero or more working intervals for each weekday. The user can add a date exception that makes a specific local date unavailable, or replaces that date's normal intervals with a different set. The user can view the configured intervals and exceptions.
+**Main interaction.** In Settings, the user selects a local timezone, then defines zero or more working intervals for each weekday. Each interval has a start, an end, and a pause budget for breaks. The user can add a date exception that makes a specific local date unavailable, or replaces that date's normal intervals with a different set, including replacement pause budgets. The user can view the configured intervals, pause budgets, and exceptions.
 
-**Observable outcome.** The application stores the intervals and exceptions and uses them for every itinerary and forecast. Multiple intervals on the same day are allowed, and the gap between them is not capacity. A day off removes all capacity on that date. A replacement exception supplies only the replacement intervals on that date. Capacity that has already elapsed is excluded. The application displays capacity in the configured timezone.
+**Observable outcome.** The application stores the intervals, pause budgets, and exceptions and uses them for every itinerary and forecast. Multiple intervals on the same day are allowed, and the gap between them is not capacity. A pause budget is reserved for unscheduled breaks and is subtracted from the interval's capacity; it is not an itinerary item and is not placed at a fixed time. A day off removes all capacity on that date. A replacement exception supplies only the replacement intervals on that date. Capacity that has already elapsed is excluded. The application displays capacity and pause budgets in the configured timezone.
 
-**Alternative and failure paths.** An interval that ends before or at its start is rejected with field-level feedback. Overlapping intervals are rejected. An invalid weekday, invalid date, unknown exception kind, or a replacement exception with no intervals is rejected. A failed availability write leaves the previous configuration intact. If no availability is configured at all, the Today view shows a persistent setup warning and does not fabricate an itinerary.
+**Alternative and failure paths.** An interval that ends before or at its start is rejected with field-level feedback. Overlapping intervals are rejected. A negative pause budget, or a pause budget greater than or equal to the interval duration, is rejected. An invalid weekday, invalid date, unknown exception kind, or a replacement exception with no intervals is rejected. A failed availability write leaves the previous configuration intact. If no availability is configured at all, the Today view shows a persistent setup warning and does not fabricate an itinerary.
 
 **Acceptance scenarios.**
 
@@ -354,18 +396,21 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 - **Given** a date has replacement intervals 14:00 to 16:00, **when** the itinerary is computed, **then** only 14:00 to 16:00 provides capacity on that date.
 - **Given** the user enters two overlapping intervals, **when** they save, **then** the application rejects the change with field-level feedback and keeps the previous availability.
 - **Given** the user is currently inside a working interval, **when** the itinerary is computed, **then** capacity begins at the current time rather than at the interval's original start.
+- **Given** an eight-hour interval with a 60-minute pause budget, **when** the itinerary is computed, **then** seven hours of work capacity are available and no lunch break appears as an itinerary item.
+- **Given** the same interval, **when** the user takes a break without changing availability, **then** the break is not scheduled in advance and the pause budget already reserved the time.
+- **Given** a 60-minute interval, **when** the user enters a pause budget of 60 minutes or more, **then** the application rejects the interval.
 
-**Rules used.** RULE-TIME-1, RULE-VAL-1, RULE-CAP-1 through RULE-CAP-7, RULE-WARN-4.
+**Rules used.** RULE-TIME-1, RULE-VAL-1, RULE-CAP-1 through RULE-CAP-8, RULE-WARN-4.
 
 ### 4.2 Configure planning horizon and application preferences
 
-**Story SETUP-2. Planning preferences.** As a worker, I want to configure the planning horizon and tray behavior, so that the planner matches how far ahead I plan and how I use the tray.
+**Story SETUP-2. Planning preferences.** As a worker, I want to configure the planning horizon, service mode, notifications, and tray behavior, so that the planner matches how far ahead I plan and how I use the application.
 
 **Starting conditions.** The application is installed.
 
-**Main interaction.** In Settings, the user sets the planning horizon between 7 and 365 calendar days. The default is 90 days. The user can see the local data directory and start an export. The user can configure tray preferences: launch at login where the platform supports it, show the active timer in the tray tooltip, and, where the platform supports it, whether the popup hides when it loses focus. A platform that cannot support launch at login MUST NOT pretend to.
+**Main interaction.** In Settings, the user sets the planning horizon between 7 and 365 calendar days. The default is 90 days. The user can see the local data directory and start an export. The user can choose the daemon or single-process service mode and can enable start at login where supported. The user can configure notification preferences: critical warnings, estimate overruns, approaching deadlines once DEC-16 defines that trigger, quiet hours, and platform permission. The user can configure tray preferences: show the active timer in the tray tooltip and, where the platform supports it, whether the popup hides when it loses focus. A platform that cannot support launch at login MUST NOT pretend to.
 
-**Observable outcome.** A changed horizon changes the itinerary and forecast window after recalculation. Settings persist across restarts. The data directory is visible. The export action produces a portable representation of user data.
+**Observable outcome.** A changed horizon changes the itinerary and forecast window after recalculation. The selected service mode determines whether the planner can outlive the desktop window. Notification preferences control which operating-system notifications are delivered. Settings persist across restarts. The data directory is visible. The export action produces a portable representation of user data.
 
 **Alternative and failure paths.** A horizon outside 7 to 365 is rejected with field-level feedback. A platform-specific tray preference that cannot be honored is shown as unavailable or is omitted, not silently accepted. An export failure reports an error and leaves the data intact.
 
@@ -375,8 +420,9 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 - **Given** the user changes the horizon to 30 days, **when** the itinerary is recomputed, **then** work beyond the 30-day window is not scheduled.
 - **Given** the user enters a horizon of 0 or 400 days, **when** they save, **then** the application rejects the value with field-level feedback.
 - **Given** the platform does not support launch at login, **when** the user opens tray preferences, **then** the option is unavailable or absent and the application does not claim it will work.
+- **Given** notifications are disabled, **when** a critical warning appears, **then** the warning remains visible in the application and no operating-system notification is delivered.
 
-**Rules used.** RULE-CAP-6, RULE-VAL-1, RULE-DATA-1.
+**Rules used.** RULE-CAP-6, RULE-VAL-1, RULE-DATA-1, RULE-NOTIF-1.
 
 ### 4.3 Create and manage projects
 
@@ -395,7 +441,9 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 - **Given** a project titled "Atlas" with priority 2 and a Friday deadline, **when** a task with no own deadline is added to it, **then** the task's effective deadline is Friday.
 - **Given** a project deadline is moved earlier, **when** the change would make a task miss its deadline, **then** the change is saved and a missed risk is reported rather than the change being rejected.
 - **Given** a project is paused, **when** the itinerary is computed, **then** none of its tasks are scheduled.
-- **Given** a project is completed, **when** the user views the Projects view, **then** it is no longer shown among active projects, and its unfinished tasks are not scheduled.
+- **Given** a project is completed, **when** the user views the Projects view, **then** it remains available in project history, is not shown as active, and its unfinished tasks are not scheduled.
+- **Given** a project is archived, **when** the user views the default Projects view, **then** the project is hidden from the active list, remains available in history and export, and its unfinished tasks are not scheduled.
+- **Given** a completed project with unfinished tasks, **when** the user reopens it, **then** it becomes active again and its tasks can be scheduled.
 - **Given** a project title is 201 characters, **when** the user saves, **then** the application rejects it with a field-level error.
 
 **Rules used.** RULE-VAL-1, RULE-STATE-5, RULE-EFF-1, RULE-STATE-6.
@@ -404,18 +452,20 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 
 **Story WORK-2. Tasks and inbox.** As a worker, I want to capture work quickly, keep unready work out of the schedule, and promote it when it is ready, so that the itinerary contains only work I can actually do.
 
-**Starting conditions.** The user has opened Today, the Tasks view, or a task editor. A project may or may not exist.
+**Starting conditions.** The user has opened Today, the Tasks view, or a task editor, or is working with an active task. A project may or may not exist.
 
-**Main interaction.** The user creates a task with a title. A quick-add path creates an inbox task with at least a title; details can be completed later. In the task editor the user sets description, project, priority, estimate, optional deadline, source metadata, and status. The user can move an inbox task to ready after supplying a positive estimate. The user can complete, cancel, or reopen a task.
+**Main interaction.** The user creates a task with a title. A quick-capture action is reachable from Today, the task view, the tray, and a global shortcut where the platform supports it. It creates an inbox task with only a title and does not stop an active timer; details can be completed later. In the task editor the user sets description, project, priority, estimate, optional deadline, source metadata, and status. The user can move an inbox task to ready after supplying a positive estimate. The user can complete, cancel, or reopen a task.
 
-**Observable outcome.** An inbox task appears in the task list but never in the itinerary. A ready task with a positive estimate becomes eligible. Completing a task removes it from the itinerary and records a completion time. Reopening it clears the completion time and makes it plannable again. Cancelling removes it from planning and keeps its time entries.
+**Observable outcome.** Quick capture records the task immediately and returns the user to the interrupted context. An inbox task appears in the task list but never in the itinerary. Capturing while a timer runs does not stop, pause, or change the timer. A ready task with a positive estimate becomes eligible. Completing a task removes it from the itinerary and records a completion time. Reopening it clears the completion time and makes it plannable again. Cancelling removes it from planning and keeps its time entries. When an inbox task lacks an estimate, the application MAY suggest that the user add one, but it MUST NOT invent an estimate or move the task out of the inbox automatically.
 
 **Alternative and failure paths.** A ready or in-progress task without a positive estimate is rejected with a field-level error. An empty or overlong title is rejected. A task with a project that does not exist is rejected. A caller cannot set a blocked status. Completing a task with incomplete prerequisites requires explicit confirmation; without it, the completion is rejected and the incomplete prerequisites are named.
 
 **Acceptance scenarios.**
 
 - **Given** the user quick-adds a task with only a title, **when** it is saved, **then** it is in the inbox and does not appear in the itinerary.
+- **Given** an active timer, **when** the user quick-captures a task, **then** the task is saved and the active timer continues without interruption.
 - **Given** an inbox task with no estimate, **when** the user tries to mark it ready, **then** the application rejects the change and asks for a positive estimate.
+- **Given** an inbox task with no estimate, **when** the user opens it, **then** the application MAY suggest adding an estimate but does not invent one or promote the task automatically.
 - **Given** an inbox task with estimate 45, **when** the user marks it ready, **then** it becomes eligible for the itinerary.
 - **Given** a task with an unfinished prerequisite, **when** the user completes it without confirming, **then** the application rejects the completion and names the unfinished prerequisite.
 - **Given** the same task, **when** the user confirms completion, **then** the task is completed and the dependency edge remains.
@@ -431,7 +481,7 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 
 **Main interaction.** The user edits the task's priority, estimate, deadline, and source metadata. The user can change these at any time, including after work has been logged. Saving valid changes triggers a recalculation.
 
-**Observable outcome.** The task's priority, estimate, deadline, source, and effective deadline are visible in the task detail. Changing an estimate changes remaining effort and future projections. Changing a deadline changes the effective deadline and forecast. Changing priority affects ordering only after deadline and dependency pressure. Source metadata is provenance and does not create an attachment.
+**Observable outcome.** The task's priority, estimate, deadline, source, and effective deadline are visible in the task detail. Each priority shows its label and semantic meaning from Section 3.4. Changing an estimate changes remaining effort and future projections. Changing a deadline changes the effective deadline and forecast. Changing priority affects ordering only after deadline and dependency pressure. Source metadata is provenance and does not create an attachment.
 
 **Alternative and failure paths.** A priority outside 1 to 5, an estimate that is not a positive whole minute value for a schedulable task, or an overlong title is rejected with field-level feedback. A deadline in the past is allowed; if work remains, it is reported as missed. A task deadline later than its project deadline is allowed; the effective deadline remains the earlier project deadline. An estimate revision below logged work produces an overrun warning and does not silently increase the estimate.
 
@@ -442,18 +492,19 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 - **Given** a task with no deadline in an active project with a Friday deadline, **when** the user views the task, **then** its effective deadline is Friday.
 - **Given** a task with a deadline later than its project's deadline, **when** the forecast is computed, **then** the project deadline is used as the effective deadline.
 - **Given** a task deadline in the past with work remaining, **when** the forecast is computed, **then** the risk is missed.
+- **Given** a priority picker, **when** the user opens it, **then** each value shows its label, scheduling meaning, and an example.
 
-**Rules used.** RULE-VAL-1, RULE-EFF-1, RULE-EFFORT-1, RULE-EFFORT-2, RULE-ORDER-1, RULE-RISK-1.
+**Rules used.** RULE-VAL-1, RULE-PRIO-1, RULE-EFF-1, RULE-EFFORT-1, RULE-EFFORT-2, RULE-ORDER-1, RULE-RISK-1, RULE-STATE-8.
 
 ### 4.6 Create and remove dependencies
 
-**Story DEP-1. Dependencies.** As a worker, I want to record which work has to happen first and prevent invalid graphs, so that the itinerary never proposes a successor before its prerequisites.
+**Story DEP-1. Dependencies.** As a worker, I want to record which work has to happen first and prevent invalid graphs, so that the itinerary does not propose a successor before its prerequisites by default.
 
 **Starting conditions.** Two or more tasks exist.
 
 **Main interaction.** In the task editor, the user adds a prerequisite to a task and can view both prerequisites and dependents. The user can remove a dependency. The application validates that both tasks exist, that the edge is not a self-edge, that it is not a duplicate, and that it does not create a cycle.
 
-**Observable outcome.** A valid edge appears in both tasks' dependency views. The successor is not actionable while the predecessor is unfinished. The scheduler allocates the predecessor before the successor. Removing an edge removes the constraint. A cycle is rejected with the concrete cycle path.
+**Observable outcome.** A valid edge appears in both tasks' dependency views. The successor is not actionable while the predecessor is unfinished. The scheduler allocates the predecessor before the successor. Removing an edge removes the constraint. A cycle is rejected with the concrete cycle path. A self-edge is rejected because a task cannot be its own prerequisite and could never become satisfiable.
 
 **Alternative and failure paths.** A self-edge is rejected. A duplicate edge is rejected as a conflict. An edge to a nonexistent task is rejected as not found. A cycle is rejected with the path, and no edge is stored. Reordering the dependency list or retrying an identical valid request MUST NOT produce duplicate edges.
 
@@ -473,11 +524,11 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 
 **Starting conditions.** A task has at least one unfinished prerequisite.
 
-**Main interaction.** The user views the blocked task and sees which prerequisite is unfinished. The task is not selectable for new scheduled work. The user can complete the prerequisite, remove the dependency, or complete the blocked task with explicit confirmation if the work happened out of order.
+**Main interaction.** The user views the blocked task and sees which prerequisite is unfinished. The task is not selectable for new scheduled work. The user can complete the prerequisite, remove the dependency, complete the blocked task with explicit confirmation if the work happened out of order, or make an explicit override to start the blocked task anyway. An override does not mark the prerequisite complete and does not hide the blocked state.
 
 **Observable outcome.** Blocked work is visible but not scheduled. The blocker is named. Completing the prerequisite clears the blocked state. Completing a blocked task after confirmation records the completion and preserves the dependency edge. Cancelling a prerequisite does not satisfy its dependents; they remain blocked until the dependency is removed or the prerequisite is completed.
 
-**Alternative and failure paths.** The application MUST NOT let a blocked task appear as actionable. A missing or ineligible prerequisite makes the dependent path blocked, not safe. The application MUST NOT silently delete or rewrite dependencies to resolve a block.
+**Alternative and failure paths.** The application MUST NOT let a blocked task appear as actionable without an explicit override. A missing or ineligible prerequisite makes the dependent path blocked, not safe. The application MUST NOT silently delete or rewrite dependencies to resolve a block. An override without confirmation is rejected.
 
 **Acceptance scenarios.**
 
@@ -486,18 +537,20 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 - **Given** A is cancelled, **when** the user checks B, **then** B remains blocked and the application explains that a cancelled prerequisite does not satisfy the dependency.
 - **Given** A is completed, **when** the plan is recomputed, **then** B becomes eligible.
 - **Given** B is blocked, **when** the user confirms completion, **then** B is completed and the edge A to B remains.
+- **Given** B is blocked, **when** the user starts it with an explicit override, **then** the timer starts, B remains reported as blocked, and the override is visible.
+- **Given** B is blocked, **when** the user starts it without an override or confirmation, **then** the start is rejected.
 
-**Rules used.** RULE-STATE-1, RULE-STATE-3, RULE-STATE-4, RULE-ELIG-1, RULE-CLOS-3, RULE-RISK-1.
+**Rules used.** RULE-STATE-1, RULE-STATE-3, RULE-STATE-4, RULE-ELIG-1, RULE-CLOS-3, RULE-RISK-1, RULE-OVERRIDE-1 through RULE-OVERRIDE-6.
 
 ### 4.8 See the itinerary
 
-**Story PLAN-1. Today's plan.** As a worker, I want a credible, ordered plan for the available time, so that I know what to do next without rebuilding the plan myself.
+**Story PLAN-1. Today's plan.** As a worker, I want a credible, automatically ordered plan for the available time, so that I know what to do next without rebuilding or maintaining the plan myself.
 
 **Starting conditions.** The user has configured availability and has at least one eligible task, or has no eligible work.
 
-**Main interaction.** The user opens Today. The application shows the current date, remaining capacity today, the active task if any, a chronological itinerary grouped by working interval, and a warnings section. The user can start, pause, or complete work, add a task quickly, open a task detail, or open the full task and project views. The user cannot drag to reorder the itinerary.
+**Main interaction.** The user opens Today. The application shows the current date, remaining capacity today, the active task if any, a chronological itinerary grouped by working interval, and a warnings section. The user can start, pause, or complete work, capture a task quickly, open a task detail, or open the full task and project views. The user cannot drag to reorder the itinerary. The user can request an explicit override to work on a specific task next.
 
-**Observable outcome.** The itinerary contains only eligible work, does not exceed capacity, respects dependencies, splits long work into at most 60-minute items, and orders work by the rules in Section 5.9. It starts now and can extend across future working intervals within the horizon. Each item shows the task, project when present, allocated time, a deadline or risk indicator when relevant, and an explanation on demand. Work that cannot fit is unscheduled rather than placed outside capacity.
+**Observable outcome.** The itinerary is the primary product output. It contains only eligible work, does not exceed capacity after pause budgets, respects dependencies, splits long work into at most 60-minute items, and orders work by the rules in Section 5.9 without hand maintenance. It starts now and can extend across future working intervals within the horizon. Each item shows the task, project when present, allocated time, a deadline or risk indicator when relevant, and an explanation on demand. Work that cannot fit is unscheduled rather than placed outside capacity. Pause budgets are shown as reserved time, not as itinerary items.
 
 **Alternative and failure paths.** If there is no eligible work, the empty state explains which condition applies: no work, no working hours, no capacity in the horizon (for example, every day is marked unavailable), all tasks blocked, missing estimates, or work that is ineligible because its project is paused, completed, or archived. If no working hours are configured, no itinerary is fabricated. If an active dependency cycle is found, the application reports it and does not produce a partial plan. If there is capacity but no eligible work, the capacity is left unused.
 
@@ -511,8 +564,10 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 - **Given** all tasks are blocked, **when** the user opens Today, **then** the empty state says that work is blocked and names at least one blocker.
 - **Given** the only remaining tasks belong to a paused project, **when** the user opens Today, **then** the empty state explains that the project is paused rather than claiming there is no work.
 - **Given** the user tries to drag an item to a new position, **when** the interaction is attempted, **then** the application does not support manual reordering and the system-owned order remains.
+- **Given** two tasks with the same fields and creation times supplied in a different input order, **when** the itinerary is recomputed, **then** the system produces the same deterministic order without user maintenance.
+- **Given** a task the user wants next, **when** the user confirms an explicit override, **then** the task is treated as next, the override is visible, and the rest of the order is still computed by the system.
 
-**Rules used.** RULE-ELIG-1, RULE-ORDER-1 through RULE-ORDER-3, RULE-ALLOC-1 through RULE-ALLOC-5, RULE-CAP-1 through RULE-CAP-7.
+**Rules used.** RULE-ELIG-1, RULE-ORDER-1 through RULE-ORDER-3, RULE-ALLOC-1 through RULE-ALLOC-5, RULE-CAP-1 through RULE-CAP-8, RULE-OVERRIDE-1 through RULE-OVERRIDE-6.
 
 ### 4.9 Understand why work was selected
 
@@ -536,15 +591,15 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 
 **Rules used.** RULE-ORDER-1, RULE-REASON-1 through RULE-REASON-3, RULE-DET-1.
 
-### 4.10 See deadline forecasts
+### 4.10 See supporting deadline forecasts
 
-**Story RISK-1. Deadline feasibility.** As a worker, I want to see whether each task and project can still meet its deadline, so that I can act before a commitment becomes impossible.
+**Story RISK-1. Deadline feasibility.** As a worker, I want a supporting view of whether each task and project can still meet its deadline, so that I can act before a commitment becomes impossible without letting forecasts dominate the plan.
 
 **Starting conditions.** At least one unfinished task exists. A task or project may have a deadline.
 
 **Main interaction.** The user opens a task detail, the Projects view, the Review view, or the deadline-risk section of Today. The application shows the effective deadline when one exists, projected finish, slack, risk, and explanation for each task and active project. The user can open the dependency-critical path for a project.
 
-**Observable outcome.** A forecast is computed from the dependency closure and capacity before the effective deadline. A project forecast includes all unfinished tasks in the project and their prerequisites. A shared prerequisite is counted once. A task with no deadline has null slack, not a sentinel value. A task that cannot be placed within the horizon is unscheduled unless it is blocked or missed, and it MUST NOT be assigned a fabricated time. A blocked path is blocked and names the missing or ineligible prerequisite. A passed deadline with work remaining is missed.
+**Observable outcome.** Forecasts are secondary to the itinerary and never replace it. A forecast is computed from the dependency closure and capacity before the effective deadline. A project forecast includes all unfinished tasks in the project and their prerequisites. A shared prerequisite is counted once. A task with no deadline has null slack, not a sentinel value. A task that cannot be placed within the horizon is unscheduled unless it is blocked or missed, and it MUST NOT be assigned a fabricated time. A blocked path is blocked and names the missing or ineligible prerequisite. A passed deadline with work remaining is missed.
 
 **Alternative and failure paths.** If no capacity exists, the forecast is unscheduled or missed according to Section 5.8, and it MUST NOT be classified as safe. If a prerequisite is missing or ineligible, the forecast is blocked. If the deadline is beyond the planning horizon, the treatment is unresolved; see DEC-5. A forecast failure MUST NOT present a stale forecast as current.
 
@@ -568,20 +623,22 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 
 **Main interaction.** The user opens Today or the tray popup, or the Review view. Warnings are shown as first-class state, ordered by severity. For a tight or missed deadline, the user can inspect the shortfall in minutes or hours, the affected deliverable, and the dependency path. The user can respond by changing the estimate, deadline, priority, dependency, availability, or by completing or logging work. The application does not invent a dismiss action; a warning resolves when its condition is no longer true.
 
-**Observable outcome.** A tight forecast produces a `deadline_tight` warning. A missed forecast produces a `deadline_missed` warning and is presented as critical under the suggested severity mapping. An estimate overrun produces `estimate_overrun` and leaves the estimate unchanged. A blocked deadline path produces `blocked_deadline_path` and MUST NOT be reported as safe. Excess total work produces `plan_over_capacity`. No working hours produces `no_working_hours` and no itinerary. Warnings appear in Today and critical warnings appear in the tray popup. They resolve automatically after a recalculation that removes the condition.
+**Observable outcome.** The user can enable operating-system notifications for critical warnings and approaching deadlines. A tight forecast produces a `deadline_tight` warning. A missed forecast produces a `deadline_missed` warning with its shortfall; DEC-8 governs its severity. An estimate overrun produces `estimate_overrun` and leaves the estimate unchanged. A blocked deadline path produces `blocked_deadline_path` and MUST NOT be reported as safe. Excess total work produces `plan_over_capacity`. No working hours produces `no_working_hours` and no itinerary. Warnings appear in Today and critical warnings appear in the tray popup. They resolve automatically after a recalculation that removes the condition.
 
 **Alternative and failure paths.** A warning MUST NOT be shown as a transient toast only. A warning MUST NOT block an otherwise valid action. A warning MUST NOT claim a guarantee. A warning about a blocked path MUST name the missing or ineligible prerequisite. A warning about a shortfall MUST state the shortfall in minutes or hours.
 
 **Acceptance scenarios.**
 
-- **Given** a project with slack -60 minutes, **when** the plan is recomputed, **then** a `deadline_missed` warning identifies the project, states the 60-minute shortfall, and uses the suggested critical severity.
+- **Given** a project with slack -60 minutes, **when** the plan is recomputed, **then** a `deadline_missed` warning identifies the project and states the 60-minute shortfall.
 - **Given** the user adds enough working availability to remove the shortfall, **when** the plan is recomputed, **then** the warning resolves automatically.
 - **Given** a task whose logged time exceeds its estimate, **when** the plan is recomputed, **then** an `estimate_overrun` warning appears and the original estimate is retained.
 - **Given** no working hours, **when** the user opens Today, **then** a persistent `no_working_hours` setup warning appears and no itinerary is fabricated.
 - **Given** a deadline-bearing task whose closure contains an inbox prerequisite, **when** the plan is recomputed, **then** the risk is `blocked` and the warning names the prerequisite.
 - **Given** a critical warning and a warning-level warning, **when** the user opens Today, **then** the critical warning is listed first.
+- **Given** notifications are enabled for critical warnings, **when** a critical warning appears, **then** an operating-system notification is delivered and the same warning remains visible in the application and tray.
+- **Given** a warning resolves, **when** the plan is recomputed, **then** its notification is withdrawn or marked resolved and does not fire again for the same condition.
 
-**Rules used.** RULE-WARN-1 through RULE-WARN-5, RULE-RISK-1, RULE-RISK-4, RULE-FCAST-4.
+**Rules used.** RULE-WARN-1 through RULE-WARN-5, RULE-NOTIF-1 through RULE-NOTIF-4, RULE-RISK-1, RULE-RISK-4, RULE-FCAST-4.
 
 ### 4.12 Start, pause, and complete work
 
@@ -589,11 +646,11 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 
 **Starting conditions.** At least one ready or in-progress task exists. A task may already be active.
 
-**Main interaction.** The user starts a task from Today, the task detail, or the tray. If another task is active, the desktop interface asks for confirmation before stopping it. The user can pause the timer, resume it, or complete the task. The active task card shows the task title, project, elapsed time, estimate, and controls. The top of the application shows a persistent active-timer indicator.
+**Main interaction.** The user starts a task from Today, the task detail, or the tray. If another task is active, the desktop interface asks for confirmation before stopping it. The user can pause the timer, resume it, or complete the task. Pausing is how the user takes an unscheduled break; the pause budget already reserves capacity, so no break item is added to the itinerary. The active task card shows the task title, project, elapsed time, estimate, and controls. The top of the application shows a persistent active-timer indicator.
 
 **Observable outcome.** Starting a task opens a time entry and makes it the single current task. Elapsed time is visible and contributes to logged work and remaining effort while the timer runs. Pausing closes the current entry and keeps the task current and in progress. Starting another task after confirmation closes the previous entry and returns the previous task to ready unless it was completed or cancelled. Completing the active task closes the entry and marks the task completed. The tray tooltip shows the current task and elapsed time, or "No active task."
 
-**Alternative and failure paths.** An agent starting a task while another is active MUST fail with an active-timer conflict unless it explicitly requests stopping the active timer. A second active timer MUST NOT exist. Starting an ineligible task is rejected. Completing a task with incomplete prerequisites follows the confirmation rule. If the timer cannot be persisted, the start fails and no open entry is left behind.
+**Alternative and failure paths.** An agent starting a task while another is active MUST fail with an active-timer conflict unless it explicitly requests stopping the active timer. A second active timer MUST NOT exist. Starting a blocked task is rejected unless the user makes an explicit dependency override, and a task started by override remains reported as blocked. Inbox tasks, tasks without an estimate, and tasks in a paused, completed, or archived project are not overridable. Completing a task with incomplete prerequisites follows the confirmation rule. If the timer cannot be persisted, the start fails and no open entry is left behind.
 
 **Acceptance scenarios.**
 
@@ -658,7 +715,7 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 
 **Starting conditions.** At least one task exists, possibly none.
 
-**Main interaction.** The user opens the Tasks view and searches or sorts the task list. The list shows title, project, status, priority, estimate, logged time, remaining effort, effective deadline, dependencies, source, and forecast risk. The user opens a task detail to edit fields, manage dependencies, view prerequisites and dependents, view time entries, view tracker attachments, and see the forecast explanation and projected finish.
+**Main interaction.** The user opens the Tasks view and searches or sorts the task list. The list shows title, project, status, priority, estimate, logged time, remaining effort, effective deadline, dependencies, source, and forecast risk. The user opens a task detail to edit fields, manage dependencies, view prerequisites and dependents, view time entries, view source metadata, and see the forecast explanation and projected finish.
 
 **Observable outcome.** Search narrows the list to matching tasks. The list includes inbox, ready, in-progress, completed, and cancelled tasks unless a filter narrows it. Sorting changes the display order without changing the itinerary order. The task detail reflects saved changes after recalculation. Field-level errors appear next to the fields that caused them. A dependency cycle error includes the path. The detail shows both sides of each dependency.
 
@@ -720,69 +777,76 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 
 **Story AGENT-1. Agent read access.** As an agent, I want to read the current plan, risks, projects, tasks, dependencies, and logs, so that I can give the user context-aware help.
 
-**Starting conditions.** The desktop application is running and the agent is a local MCP client. The application may have no tasks.
+**Starting conditions.** The planner service is running, either as a local daemon or inside the desktop application, and the agent is a local MCP client. The service may have no tasks.
 
-**Main interaction.** The agent requests a read view: today's itinerary and active task, active risks and warnings, a project's details and forecast, or a task's details, dependencies, time entries, attachments, and forecast. It can list and filter tasks by project, status, due window, risk, or text. It can list available tracker plugins. The application returns the same data and projections that the desktop interface shows.
+**Main interaction.** The agent requests a read view: today's itinerary and active task, active risks and warnings, a project's details and forecast, or a task's details, dependencies, time entries, overrides, and forecast. It can list and filter tasks by project, status, due window, risk, or text. It can ask what changed since a change cursor. In v2 it can list available tracker plugins. The application returns the same data and projections that the desktop interface shows.
 
-**Observable outcome.** The agent sees the current itinerary, remaining capacity, active timer, warnings, task and project details, dependencies, time entries, and forecasts. The agent sees explanations for scheduled items. The agent does not see plugin secrets. Read operations do not mutate data.
+**Observable outcome.** The agent sees the current itinerary, remaining capacity, active timer, warnings, task and project details, dependencies, time entries, overrides, and supporting forecasts. The agent sees explanations for scheduled items. The change feed returns created, updated, completed, cancelled, time-entry, override, and availability changes since the supplied cursor, with a new cursor. In v2, the agent does not see plugin secrets. Read operations do not mutate data.
 
-**Alternative and failure paths.** If the application is not running, the agent receives a clear unavailable-service error. A request for a nonexistent entity returns a not-found error. A malformed or unauthorized request returns a validation error. The agent MUST NOT open the local data store directly or compute a different plan.
+**Alternative and failure paths.** If the planner service is unavailable, the agent receives a clear unavailable-service error. A request for a nonexistent entity returns a not-found error. A malformed or unauthorized request returns a validation error. An expired or unknown change cursor returns a clear error with the earliest cursor the service can serve. The agent MUST NOT open the local data store directly or compute a different plan.
 
 **Acceptance scenarios.**
 
-- **Given** the application is running with a plan, **when** an agent reads today, **then** it receives the same ordered items, reasons, capacity, active task, and warnings as the desktop interface.
+- **Given** the planner service is running with a plan, **when** an agent reads today, **then** it receives the same ordered items, reasons, capacity, active task, and warnings as the desktop interface.
 - **Given** an agent requests a task that does not exist, **when** the request is handled, **then** it receives a clear not-found error.
 - **Given** the application is not running, **when** an agent requests today's plan, **then** it receives a clear unavailable-service error.
-- **Given** a task with dependencies and time entries, **when** an agent reads it, **then** it receives the dependencies, logs, and forecast.
+- **Given** a task with dependencies and time entries, **when** an agent reads it, **then** it receives the dependencies, logs, overrides, and forecast.
+- **Given** a change cursor from an earlier read, **when** an agent requests changes since that cursor, **then** it receives the changes made since then and a new cursor.
+- **Given** an unknown change cursor, **when** an agent requests changes, **then** it receives a clear error and can request a full read.
 
-**Rules used.** RULE-ORDER-1, RULE-REASON-2, RULE-FCAST-4, RULE-ARCH-1.
+**Rules used.** RULE-ORDER-1, RULE-REASON-2, RULE-FCAST-4, RULE-ARCH-1, RULE-ACTIVITY-1 through RULE-ACTIVITY-3.
 
 ### 4.19 Let an agent change work
 
-**Story AGENT-2. Agent write access.** As an agent, I want to create, update, complete, cancel, link, time, and configure work, so that I can keep the plan current while the user works.
+**Story AGENT-2. Agent write access.** As an agent, I want to create, update, complete, cancel, link, time, adjust scheduling inputs, and explicitly override work, so that I can keep the plan current while the user works.
 
-**Starting conditions.** The application is running. The agent uses explicit identifiers and the same application service as the desktop interface.
+**Starting conditions.** The planner service is running. The agent uses explicit identifiers and the same planner service as the desktop interface.
 
-**Main interaction.** The agent creates and updates tasks and projects; sets and removes dependencies; completes or cancels tasks; creates, updates, and deletes time entries; starts and stops a timer; sets working hours and exceptions; lists plugins; searches, attaches, refreshes, and detaches tracker context; and requests schedule diagnostics. Every change uses explicit identifiers and structured fields.
+**Main interaction.** The agent creates and updates tasks and projects; sets and removes dependencies; completes or cancels tasks; creates, updates, and deletes time entries; starts and stops a timer; sets working hours and exceptions; edits scheduling inputs when the user asks; requests explicit overrides when the user asks; and requests schedule diagnostics. In v2 it can list plugins and search, attach, refresh, or detach tracker context. Every change uses explicit identifiers and structured fields. An agent MUST NOT invent an override or scheduling input edit that the user did not request.
 
-**Observable outcome.** A successful change takes effect once, triggers the same recalculation as a desktop change, and is visible to the desktop and tray after refresh. An agent-created task appears in the task list. An agent-logged time entry changes remaining effort and forecasts. An agent-completed task leaves the itinerary. An agent-started timer becomes the single active timer if the request is allowed. The resulting plan is identical to a desktop-originated change with the same data.
+**Observable outcome.** A successful change takes effect once, triggers the same recalculation as a desktop change, and is visible to the desktop and tray after refresh. An agent override is recorded with the actor, target, affected rule, and time, and remains visible in the affected task and itinerary. An agent-created task appears in the task list. An agent-logged time entry changes remaining effort and forecasts. An agent-completed task leaves the itinerary. An agent-started timer becomes the single active timer if the request is allowed. The resulting plan is identical to a desktop-originated change with the same data.
 
-**Alternative and failure paths.** Fuzzy target selection is rejected. A change that would affect multiple tasks implicitly is rejected. A destructive operation without explicit confirmation is rejected. A second timer without an explicit stop request is rejected. Completion with incomplete prerequisites requires confirmation. Invalid fields, missing entities, conflicts, and dependency cycles return the same structured errors as desktop operations. An agent MUST NOT write to a remote tracker.
+**Alternative and failure paths.** Fuzzy target selection is rejected. A change that would affect multiple tasks implicitly is rejected. A destructive operation without explicit confirmation is rejected. A second timer without an explicit stop request is rejected. Completion with incomplete prerequisites requires confirmation. An override without explicit user intent and confirmation is rejected. A scheduling input edit that is arbitrary or unattributed is rejected. Invalid fields, missing entities, conflicts, and dependency cycles return the same structured errors as desktop operations. An agent MUST NOT write to a remote tracker.
 
 **Acceptance scenarios.**
 
-- **Given** the application is running, **when** an agent creates a task with an explicit project and estimate, **then** the task appears in the desktop task list after refresh.
+- **Given** the planner service is running, **when** an agent creates a task with an explicit project and estimate, **then** the task appears in the desktop task list after refresh.
 - **Given** a task with an active timer, **when** an agent starts another task without requesting a stop, **then** the request fails with an active-timer conflict.
 - **Given** the same state, **when** the agent starts another task and explicitly requests a stop, **then** the previous timer closes and the new task becomes active.
 - **Given** a time entry, **when** an agent deletes it without confirmation, **then** the request is rejected; with confirmation, it succeeds and the plan is recomputed.
 - **Given** a task with an unfinished prerequisite, **when** an agent completes it without confirmation, **then** the request is rejected; with confirmation, it succeeds.
 - **Given** a dependency change that would create a cycle, **when** an agent requests it, **then** the request is rejected with the cycle path and no edge is stored.
+- **Given** a user asks an agent to work on a blocked task, **when** the agent requests an explicit override with confirmation, **then** the task can start, remains reported as blocked, and the override is recorded.
+- **Given** an agent requests an override while the desktop window is attached, **when** the request is handled, **then** the confirmation appears on the desktop and the override proceeds only after the user confirms.
+- **Given** an agent tries to override a rule without user intent, **when** the request is handled, **then** it is rejected.
 
-**Rules used.** RULE-VAL-1, RULE-STATE-2, RULE-STATE-3, RULE-STATE-6, RULE-RECALC-1, RULE-ARCH-2.
+**Rules used.** RULE-VAL-1, RULE-STATE-2, RULE-STATE-3, RULE-STATE-6, RULE-STATE-8, RULE-RECALC-1, RULE-ARCH-2, RULE-OVERRIDE-1 through RULE-OVERRIDE-6.
 
 ### 4.20 Agent safety and unavailable service
 
 **Story AGENT-3. Agent boundaries.** As a user, I want agent access to be safe and predictable, so that automation cannot silently damage my plan or claim access it does not have.
 
-**Starting conditions.** An agent is configured as a local MCP client. The application may be running or not.
+**Starting conditions.** An agent is configured as a local MCP client. The planner service may be running as a daemon, may be inside the desktop application, or may be unavailable.
 
-**Main interaction.** The agent performs reads and writes through the local interface. The application validates every request and applies the same rules as the desktop interface.
+**Main interaction.** The agent performs reads and writes through the local interface. The planner service validates every request and applies the same rules as the desktop interface.
 
-**Observable outcome.** Explicit identifiers are required for changes. No operation changes several tasks implicitly. Destructive operations require confirmation. The agent MUST NOT receive plugin secrets. The agent MUST NOT access the local data store directly. When the application is not running, the agent receives a clear unavailable-service error and does not fall back to a stale or independent plan.
+**Observable outcome.** Explicit identifiers are required for changes. No operation changes several tasks implicitly. Destructive operations require confirmation. Overrides require explicit user intent and confirmation; scheduling input edits require explicit user intent. In v2, the agent MUST NOT receive plugin secrets. The agent MUST NOT access the local data store directly. When the planner service is unavailable, the agent receives a clear unavailable-service error and does not fall back to a stale or independent plan.
 
-**Alternative and failure paths.** A disabled or unavailable tracker plugin returns a plugin error. A plugin timeout or malformed response is contained and does not impair local planning. A request from another operating-system user is rejected. The agent MUST NOT start a headless service in v1.
+**Alternative and failure paths.** In v2, a disabled or unavailable tracker plugin returns a plugin error, and a plugin timeout or malformed response is contained and does not impair local planning. A request from another operating-system user is rejected. The agent MUST NOT start a competing service, a second data owner, or a mode that bypasses the configured service mode.
 
 **Acceptance scenarios.**
 
-- **Given** the application is not running, **when** an agent attempts any operation, **then** it receives a clear unavailable-service error.
+- **Given** the planner service is unavailable, **when** an agent attempts any operation, **then** it receives a clear unavailable-service error.
 - **Given** an agent request with a title instead of an identifier, **when** a change is attempted, **then** the request is rejected because explicit identifiers are required.
 - **Given** an agent request that would update several tasks implicitly, **when** it is attempted, **then** the request is rejected.
-- **Given** a tracker plugin that times out, **when** an agent searches it, **then** the agent receives a plugin error and local tasks and scheduling remain usable.
+- **Given** an agent request for an override without user intent, **when** it is handled, **then** the request is rejected.
 - **Given** a destructive operation, **when** the agent omits confirmation, **then** the operation is rejected.
 
-**Rules used.** RULE-ARCH-1, RULE-ARCH-2, RULE-ARCH-4, RULE-STATE-6, RULE-PLUG-5.
+**Rules used.** RULE-ARCH-1, RULE-ARCH-2, RULE-ARCH-4, RULE-STATE-6, RULE-OVERRIDE-1 through RULE-OVERRIDE-6.
 
-### 4.21 Configure an external tracker plugin
+### 4.21 Configure an external tracker plugin (v2 advisory)
+
+**V2 advisory.** This story is not part of v1. It is retained so a future implementation has context.
 
 **Story TRACK-1. Tracker setup.** As a worker, I want to configure a read-only tracker connection, so that I can attach remote context to my local tasks.
 
@@ -804,7 +868,9 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 
 **Rules used.** RULE-PLUG-1 through RULE-PLUG-4, RULE-DATA-2.
 
-### 4.22 Search, attach, refresh, and detach tracker context
+### 4.22 Search, attach, refresh, and detach tracker context (v2 advisory)
+
+**V2 advisory.** This story is not part of v1. It is retained so a future implementation has context.
 
 **Story TRACK-2. Tracker context.** As a worker, I want to search a chosen tracker and attach a specific remote item to a local task, so that external context is available without letting the tracker control my plan.
 
@@ -831,66 +897,136 @@ Each story below has an actor, a goal, a reason the capability matters, starting
 
 **Story DATA-1. Data portability.** As a worker, I want to export and back up my planning data, so that my history is portable and recoverable without an account.
 
-**Starting conditions.** The application has local data, possibly including projects, tasks, dependencies, time entries, availability, settings, and tracker attachments.
+**Starting conditions.** The application has local data, possibly including projects, tasks, dependencies, time entries, availability, overrides, and settings. In v2 it may also include tracker attachments.
 
-**Main interaction.** In Settings, the user sees the local data directory and starts an export. The application produces a portable representation of the planning data. The user can copy the local data location for a backup while the application is not running.
+**Main interaction.** In Settings, the user sees the local data directory and starts an export. The application produces a portable representation of the planning data. The user can copy the local data location for a backup while no service owner is running.
 
-**Observable outcome.** The export contains the user's planning data in a documented, portable form. It excludes plugin secrets. The user can keep the export outside the application. Restarting the application preserves the data. The application works offline.
+**Observable outcome.** The export contains the user's planning data in a documented, portable form, including tasks, projects, dependencies, time entries, availability, overrides, and settings. When v2 tracker plugins are present, the export excludes their secrets. The v1 export contains no attachment data because attachments are v2. The user can keep the export outside the application. Restarting the application preserves the data. The application works offline.
 
 **Alternative and failure paths.** This specification does not define an import flow, automatic backup, synchronization, encryption, or recovery service. The application MUST NOT claim those capabilities. An export failure reports an error and leaves the local data intact. Secrets MUST NOT be included in an export.
 
 **Acceptance scenarios.**
 
 - **Given** local tasks, projects, dependencies, time entries, and availability, **when** the user exports, **then** the export contains that planning data in a portable form.
-- **Given** an attached tracker plugin with a secret, **when** the user exports, **then** the secret is not present in the export.
-- **Given** the user copies the local data location while the application is not running, **when** the copy is restored as the application's data location and the application starts, **then** the planning data is present.
+- **Given** a v2 attachment with a secret, **when** the user exports, **then** the secret is not present in the export.
+- **Given** the user copies the local data location while no service owner is running, **when** the copy is restored as the data location and the service starts, **then** the planning data is present.
 - **Given** no network connection, **when** the user uses tasks, projects, availability, the itinerary, time tracking, and exports, **then** they work.
 
-**Rules used.** RULE-DATA-1 through RULE-DATA-3, RULE-PLUG-4.
+**Rules used.** RULE-DATA-1 through RULE-DATA-3.
 
 ### 4.24 Run the application from the tray
 
 **Story APP-1. Tray workflow.** As a worker, I want the application to remain available when its window is closed, so that I can check and control work without reopening the full planner.
 
-**Starting conditions.** The application is running and the platform provides a system tray.
+**Starting conditions.** The planner service is running in either supported mode and the platform provides a system tray.
 
-**Main interaction.** Closing the main window hides it instead of quitting. The tray icon remains. A left click toggles a compact tray-attached popup. A right click opens a native menu with Open Planner, Start or Pause Current Task, Complete Current Task, and Quit. The tooltip shows the current task and elapsed time, or "No active task." The popup shows the current task and timer, Start, Pause, and Complete controls, the next two itinerary tasks, critical warnings, and an Open Planner action. Escape hides the popup; where the platform supports it, losing focus also hides it.
+**Main interaction.** The tray is a client of the planner service; in single-process mode the tray is co-hosted with the service. Closing the main window hides it instead of quitting. The tray icon remains. A left click toggles a compact tray-attached popup. A right click opens a native menu with Open Planner, Start or Pause Current Task, Complete Current Task, and Quit. In daemon mode, Quit closes the desktop window only; the tray client keeps running, and the tray menu owns Stop Service. In single-process mode, Quit stops the process and the service. The tooltip shows the current task and elapsed time, or "No active task." The popup shows the current task and timer, Start, Pause, and Complete controls, the next two itinerary tasks, critical warnings, and an Open Planner action. Escape hides the popup; where the platform supports it, losing focus also hides it.
 
 **Observable outcome.** The timer continues while the window is hidden. The popup shows the same active task and critical warnings as the desktop. The menu actions use the same service as the desktop. Open Planner restores the main window. The popup is compact and tray-anchored, stays above other windows where the platform supports it, and does not become a second full application.
 
-**Alternative and failure paths.** On a platform or compositor where focus-loss hiding is unreliable, Escape and explicit toggle or hide still work. If the tray is unavailable, the application MUST NOT claim tray support. Linux tray and focus behavior varies by desktop environment; support MUST be verified on common environments and limitations documented. Quit is explicit; closing the window is not quit.
+**Alternative and failure paths.** On a platform or compositor where focus-loss hiding is unreliable, Escape and explicit toggle or hide still work. If the tray is unavailable, the application MUST NOT claim tray support. Linux tray and focus behavior varies by desktop environment; support MUST be verified on common environments and limitations documented. Quit is explicit; closing the window is not quit. In daemon mode, quitting the interface does not stop the daemon, and stopping the daemon is a separate explicit action. In single-process mode, quitting stops both the interface and the service.
 
 **Acceptance scenarios.**
 
 - **Given** the main window is open, **when** the user closes it, **then** the window hides, the tray remains, and the timer keeps running.
 - **Given** the tray icon, **when** the user left-clicks, **then** the compact popup opens or closes.
-- **Given** the tray icon, **when** the user right-clicks, **then** the native menu shows Open Planner, Start or Pause Current Task, Complete Current Task, and Quit.
+- **Given** the tray icon, **when** the user right-clicks, **then** the native menu shows Open Planner, Start or Pause Current Task, Complete Current Task, and Quit, plus Stop Service in daemon mode.
 - **Given** the popup is open, **when** the user presses Escape, **then** the popup hides.
 - **Given** a critical warning exists, **when** the user opens the popup, **then** the critical warning is shown.
 - **Given** an active task, **when** the user hovers the tray icon, **then** the tooltip shows the task title and elapsed time.
+- **Given** daemon mode, **when** the user quits the desktop window, **then** the daemon and tray client remain available to agents and Stop Service is still reachable from the tray menu.
 
 **Rules used.** RULE-ARCH-1, RULE-ARCH-3, RULE-WARN-3.
 
 ### 4.25 Quit, restart, and service availability
 
-**Story APP-2. Lifecycle.** As a worker, I want to understand what stays alive when I close or quit, so that I do not lose time or data and agents do not claim access they lack.
+**Story APP-2. Lifecycle.** As a worker, I want to understand what stays alive in daemon mode and in single-process mode, so that I do not lose time or data and agents do not claim access they lack.
 
-**Starting conditions.** The application is running, possibly with the main window hidden and a timer active.
+**Starting conditions.** The planner service is running in the selected mode, possibly with the main window hidden and a timer active. An agent may attempt to connect at any time.
 
-**Main interaction.** The user closes the window, quits from the tray, and later restarts the application. An agent may attempt to connect while the application is not running.
+**Main interaction.** In daemon mode, the user starts or stops the daemon explicitly, and the desktop and tray connect to it as clients. In single-process mode, the desktop process owns the service, window, and tray. The user closes the window, quits the interface, stops the service, and later restarts it.
 
-**Observable outcome.** Closing the window hides it and keeps the application, timer, and agent access alive. Quitting stops the application service; agents then receive a clear unavailable-service error. Restarting preserves local data and settings and recomputes the plan. The behavior of an open timer across quit, restart, or crash is unresolved; see DEC-4.
+**Observable outcome.** In daemon mode, closing the interface or quitting it leaves the daemon, timer, and agent access alive. Stopping the daemon stops the service; agents then receive a clear unavailable-service error. In single-process mode, closing the window hides it and keeps the service and agent access alive, and quitting the application stops the service. In both modes, restarting preserves local data and settings and recomputes the plan. The behavior of an open timer across service stop, restart, or crash is unresolved; see DEC-4.
 
-**Alternative and failure paths.** If the service fails inside a running application, the desktop and tray show an error and do not compute their own schedules. If an agent cannot reach the service, it does not open the data store directly and does not fabricate a plan. There is no headless service mode in v1.
+**Alternative and failure paths.** If the service fails, the desktop and tray show an error and do not compute their own schedules. If an agent cannot reach the service, it does not open the data store directly and does not fabricate a plan. The agent MUST NOT start a competing service or take ownership of the data. Switching modes requires stopping the current service and starting the other mode; data is preserved and MUST NOT be written by two owners at once.
 
 **Acceptance scenarios.**
 
-- **Given** the application is running with the window hidden, **when** the user quits from the tray, **then** the application stops and an agent request receives an unavailable-service error.
-- **Given** the application is not running, **when** the user starts it, **then** the previous tasks, projects, time entries, availability, and settings are present and the plan is recomputed.
-- **Given** the application is running and an agent is connected, **when** the user closes the main window, **then** the agent can still read and write through the service.
-- **Given** the application service is unavailable while the window is open, **when** the user views Today, **then** the application reports the problem rather than showing a fabricated plan.
+- **Given** daemon mode with the interface closed, **when** an agent requests the plan, **then** the daemon serves it and the timer continues.
+- **Given** daemon mode, **when** the user stops the service, **then** an agent request receives an unavailable-service error.
+- **Given** single-process mode with the window hidden, **when** an agent requests the plan, **then** the service serves it and the timer continues.
+- **Given** single-process mode, **when** the user quits the application, **then** the service stops and an agent request receives an unavailable-service error.
+- **Given** the service is not running, **when** the user starts it, **then** the previous tasks, projects, time entries, availability, overrides, and settings are present and the plan is recomputed.
+- **Given** the service is unavailable while the window is open, **when** the user views Today, **then** the application reports the problem rather than showing a fabricated plan.
 
-**Rules used.** RULE-ARCH-1 through RULE-ARCH-4, RULE-DATA-1.
+**Rules used.** RULE-ARCH-1 through RULE-ARCH-6, RULE-DATA-1.
+
+### 4.26 Override a rule deliberately
+
+**Story OVERRIDE-1. Escape hatch.** As a user, I want a deliberate way to proceed when a planning rule blocks something I really need, so that the rules help by default without trapping me.
+
+**Starting conditions.** An action is blocked by a planning rule, such as a dependency, capacity, or ordering rule. The user is authenticated as the local owner.
+
+**Main interaction.** The application explains which rule blocked the action, what the consequence is, and what the user can do instead. An Override control is available behind an explicit action, never as the default button. The user confirms the override. The application records the actor, target, affected rule, time, and optional reason, then applies the action. The override applies to that action, not to the whole configuration. A capacity override adjusts the current local day's working window, and an ordering override moves the chosen task earlier or makes it next; neither changes weekly availability or creates a persistent order.
+
+**Observable outcome.** The action proceeds and the plan is recomputed. The override remains visible on the affected task, allocation, or history entry. Any resulting risk is reported as overridden, not as safe. The underlying data is not falsified: a blocked task remains blocked, a missing prerequisite remains missing, and a paused project remains paused. Security rules, data-integrity rules, secret handling, destructive confirmations, and another person's data cannot be overridden.
+
+**Alternative and failure paths.** An override without confirmation is rejected. An override of a non-overridable rule is rejected with an explanation. An agent override requires explicit user intent in the request and confirmation from an attached interactive surface; without one, it is rejected. An override that would corrupt data or bypass authentication is rejected. If the action still fails after the override, no partial change is left behind.
+
+**Acceptance scenarios.**
+
+- **Given** a blocked task, **when** the user opens the blocked action, **then** the default is not to start it and an Override control is available behind an explicit step.
+- **Given** the same task, **when** the user confirms an override to start it, **then** the timer starts, the task remains reported as blocked, and the override is visible.
+- **Given** an override of a security or data-integrity rule, **when** the user attempts it, **then** the application rejects it.
+- **Given** the user arrives 30 minutes late, **when** the user confirms a capacity override that shifts today's window by 30 minutes, **then** planning uses the shifted window and the override is recorded.
+- **Given** a task already scheduled after another task, **when** the user confirms an ordering override to run it next, **then** it precedes the other task, the override is visible, and no persistent pin is created.
+- **Given** an agent request that includes an override, **when** the user has not asked for it, **then** the request is rejected.
+
+**Rules used.** RULE-OVERRIDE-1 through RULE-OVERRIDE-6, RULE-ARCH-2, RULE-STATE-1.
+
+### 4.27 Use the planner without the desktop window
+
+**Story SERVICE-1. Headless service.** As a user, I want the planning service to keep running without a desktop window, so that agents and tray clients can keep working when the interface is closed or absent.
+
+**Starting conditions.** The user has selected daemon mode or single-process mode. The platform supports the selected mode.
+
+**Main interaction.** In daemon mode, the user starts the service at login or on demand. The daemon runs without a window, owns the planning data and rules, and serves the desktop, tray, and agent clients. Clients connect and disconnect without stopping the service. In single-process mode, the service starts and stops with the application.
+
+**Observable outcome.** In daemon mode, agents and clients can read and write while no desktop window exists. The timer continues in the service. In single-process mode, agent access exists only while the application runs. Both modes use the same rules, data, and projections. Only one service owns the data at a time.
+
+**Alternative and failure paths.** A daemon that cannot start reports a clear error and does not leave a partial service. A second daemon for the same data MUST NOT start. A client that cannot reach the service reports the problem and does not compute its own plan. A mode switch stops one owner before the other starts.
+
+**Acceptance scenarios.**
+
+- **Given** daemon mode with no window open, **when** an agent reads the itinerary, **then** it receives the current plan and active timer.
+- **Given** daemon mode with no window open, **when** the user opens the desktop client, **then** it connects to the running service and shows the same state.
+- **Given** single-process mode, **when** the application is not running, **then** an agent request receives an unavailable-service error.
+- **Given** daemon mode with no interactive surface attached, **when** an agent requests an override, **then** the request is rejected with `confirmation_unavailable` and no override is recorded.
+- **Given** daemon mode with the desktop window attached, **when** an agent requests an override, **then** the confirmation appears on the desktop and the override proceeds only after the user confirms.
+- **Given** a second daemon start for the same data, **when** it is attempted, **then** it is rejected and the first daemon remains the only owner.
+
+**Rules used.** RULE-ARCH-1 through RULE-ARCH-6, RULE-DATA-1.
+
+### 4.28 Receive notifications for critical conditions
+
+**Story NOTIF-1. Notifications.** As a worker, I want operating-system notifications for critical warnings, estimate overruns, and, once DEC-16 defines the trigger, approaching deadlines, so that I notice them without watching the application.
+
+**Starting conditions.** The planner service is running in either mode and the user has configured notification preferences.
+
+**Main interaction.** In Settings, the user enables or disables notification categories: critical warnings, estimate overruns, and approaching deadlines once DEC-16 defines that trigger. The user can set quiet hours and grant or deny the platform notification permission. A notification shows a short title, the affected task or project, and the reason. Activating it opens the relevant view.
+
+**Observable outcome.** When an enabled condition becomes true, one notification is delivered per condition and entity. The same warning remains visible in the application and tray. When the condition resolves, the notification is withdrawn or marked resolved and does not fire again for the same condition. Quiet hours suppress delivery without hiding the warning. A denied permission is reported in Settings and in the application; the application does not repeatedly prompt.
+
+**Alternative and failure paths.** A notification MUST NOT be the only place a warning appears. A warning MUST NOT be dismissed only by dismissing a notification. A notification failure does not block planning. A platform without notification support is shown as unsupported, not silently accepted.
+
+**Acceptance scenarios.**
+
+- **Given** notifications are enabled for critical warnings, **when** a critical warning appears, **then** one operating-system notification is delivered and the warning remains in the application.
+- **Given** quiet hours are active, **when** a critical warning appears, **then** no notification is delivered and the warning remains visible.
+- **Given** a warning resolves, **when** the plan is recomputed, **then** the notification is withdrawn or marked resolved.
+- **Given** the platform denies notification permission, **when** the user opens Settings, **then** the application reports that notifications are unavailable.
+
+**Rules used.** RULE-NOTIF-1 through RULE-NOTIF-4, RULE-WARN-1, RULE-WARN-3.
 
 ---
 
@@ -900,11 +1036,13 @@ The rules in this section are referenced by the stories. They define the observa
 
 ### 5.1 Identifiers, time, and ordering
 
-**RULE-ID-1.** Every task, project, dependency, time entry, availability exception, and attachment has a stable opaque identifier. Users and agents address records by identifier. Titles are not identifiers and need not be unique.
+**RULE-ID-1.** Every task, project, dependency, time entry, availability exception, override, and v2 attachment has a stable opaque identifier. Users and agents address records by identifier. Titles are not identifiers and need not be unique.
 
 **RULE-TIME-1.** Deadlines and time entries are absolute instants. Display uses the configured local timezone. Weekly availability and exception dates are local calendar concepts. A date exception applies to that local date. The instant represented by a date-only deadline is unresolved; see DEC-2.
 
 **RULE-ORDER-0.** Task and project lists have a stable default order. User-selected sorting changes display order only. It MUST NOT change the itinerary order.
+
+**RULE-PRIO-1.** Priorities are integers from 1 to 5. Each value has a label, a scheduling meaning, and an example as defined in Section 3.4. Lower numbers are more important. Priority is considered only after deadline pressure and dependency protection. A task priority takes precedence over a project priority when both are present.
 
 ### 5.2 Validation and state rules
 
@@ -917,6 +1055,7 @@ The rules in this section are referenced by the stories. They define the observa
 - A time entry without a positive whole-minute duration.
 - A working interval whose end is not after its start.
 - Overlapping working intervals.
+- A negative pause budget, or a pause budget greater than or equal to its interval duration.
 - An invalid weekday or exception date.
 - An exception kind other than unavailable or replacement intervals.
 - A replacement exception with no intervals.
@@ -924,7 +1063,7 @@ The rules in this section are referenced by the stories. They define the observa
 - A project or task status outside the supported values.
 - A caller-supplied blocked task status.
 
-**RULE-STATE-1.** Stored task states are inbox, ready, in progress, completed, and cancelled. Blocked is derived and MUST NOT be set directly. Completed records a completion time; leaving completed clears it. Cancelled and completed tasks are excluded from scheduling. Inbox tasks are not scheduled. Ready and in-progress tasks require a positive estimate. A completed predecessor satisfies its dependents; a cancelled predecessor does not.
+**RULE-STATE-1.** Stored task states are inbox, ready, in progress, completed, and cancelled. Blocked is derived and MUST NOT be set directly. Completed records a completion time; leaving completed clears it. Cancelled and completed tasks are excluded from scheduling. Inbox tasks MUST NOT be scheduled under normal rules. Ready and in-progress tasks require a positive estimate. A completed predecessor satisfies its dependents; a cancelled predecessor does not. An explicit dependency override MAY start a blocked task, but it does not change the stored state or make the task normally eligible.
 
 **RULE-STATE-2.** At most one task is in progress and current. Starting another task requires stopping the current timer. The desktop interface asks for confirmation. The agent interface MUST receive an explicit stop request. The previous task returns to ready unless it was completed or cancelled. Pausing stops the timer but keeps the task current and in progress. These pause and switch conventions are recorded in DEC-13.
 
@@ -932,15 +1071,17 @@ The rules in this section are referenced by the stories. They define the observa
 
 **RULE-STATE-4.** Cancelling a task excludes it from scheduling and preserves its time entries. Cancelling the active task stops its timer. Cancelling does not satisfy the task's dependents; they remain blocked until the dependency is removed or the predecessor is completed.
 
-**RULE-STATE-5.** Project statuses are active, paused, completed, and archived. Only active projects contribute schedulable tasks. Paused, completed, and archived projects do not. Changing a project's status does not delete its tasks.
+**RULE-STATE-5.** Project statuses are active, paused, completed, and archived. Under normal rules, only active projects contribute schedulable tasks. Paused, completed, and archived projects do not. No override schedules a task from a paused project. Completed means the project's intended work is done and the project remains in history. Archived means the project is set aside without claiming completion and is hidden from the default project list. Both remain exportable and can be reopened. Changing a project's status does not delete its tasks.
 
 **RULE-STATE-6.** Tasks and projects are not permanently deleted in v1; they are cancelled or archived. Time entries can be deleted with explicit confirmation. See DEC-10 for the unresolved conflict.
 
-**RULE-STATE-7.** A task that is already in progress when a new prerequisite is added is not stopped, but it is reported as blocked and is not selected for further scheduling until the prerequisite is satisfied.
+**RULE-STATE-7.** A task that is already in progress when a new prerequisite is added is not stopped, but it is reported as blocked and is not selected for further scheduling until the prerequisite is satisfied, unless the user makes an explicit override.
+
+**RULE-STATE-8.** A scheduling input edit is an explicit, validated change to a task's priority, project, estimate, deadline, or source. It changes the inputs the rules use. It MUST NOT set an allocation, an itinerary position, or a rule exception, and it is recorded in the change feed with its actor.
 
 ### 5.3 Eligibility for scheduling
 
-**RULE-ELIG-1.** A task is eligible for allocation only when all of the following hold:
+**RULE-ELIG-1.** A task is eligible for allocation under the normal rules only when all of the following hold:
 
 - Its stored status is ready or in progress.
 - It is not completed, cancelled, or in the inbox.
@@ -949,13 +1090,13 @@ The rules in this section are referenced by the stories. They define the observa
 - It is not blocked at the moment of selection: every prerequisite is completed or has been fully allocated earlier in the itinerary.
 - If its remaining effort is zero, the five-minute completion slot applies; otherwise its remaining effort is positive.
 
-**RULE-ELIG-2.** A task that is not eligible is not allocated. It may still receive a forecast of blocked or unscheduled. Ineligibility MUST NOT be hidden as safe.
+**RULE-ELIG-2.** A task that is not eligible is not allocated under the normal rules. It may still receive a forecast of blocked or unscheduled. Ineligibility MUST NOT be hidden as safe. An explicit override MAY allocate a task whose only ineligibility is dependency order, but the task remains ineligible for normal scoring, is marked as overridden, and does not make the underlying condition disappear. A task that is in the inbox, lacks a positive estimate, or belongs to a paused, completed, or archived project is not overridable.
 
-**RULE-ELIG-3.** A task in a paused project is not scheduled while the project is paused. Reactivating the project makes its tasks eligible again, subject to the other rules.
+**RULE-ELIG-3.** A task in a paused project is not scheduled while the project is paused, and no override schedules it. Reactivating the project makes its tasks eligible again, subject to the other rules.
 
 ### 5.4 Logged work, remaining effort, and estimates
 
-**RULE-EFFORT-1.** `logged minutes = sum of closed time entry durations + live elapsed minutes of the open entry, if any`. `remaining effort = max(estimate - logged minutes, 0)`.
+**RULE-EFFORT-1.** `logged minutes = sum of closed time entry durations + live elapsed minutes of the open entry, if any`. `remaining effort = max(estimate - logged minutes, 0)`. Only logged work changes remaining effort. `unallocated effort` is derived within one projection as remaining effort minus minutes already placed for the task earlier in the same projection. It is never stored, and a placed allocation does not change remaining effort.
 
 **RULE-EFFORT-2.** If logged work exceeds the estimate, the estimate is retained and an `estimate_overrun` warning is reported. The application MUST NOT silently increase the estimate. If logged work equals the estimate, remaining effort is zero and there is no overrun.
 
@@ -974,20 +1115,21 @@ The rules in this section are referenced by the stories. They define the observa
 **RULE-EFF-3.** Changing a project or task deadline is allowed even if it produces a missed forecast. The application reports the resulting risk rather than rejecting the change.
 
 ### 5.6 Availability and capacity
+**RULE-CAP-1.** Weekly availability consists of zero or more local-time intervals per weekday. Each interval MUST end after it starts and MUST NOT overlap another interval on the same weekday. Each interval has a pause budget in whole minutes. The pause budget MUST be zero or greater and less than the interval duration. v1 interprets each interval within one local day. See DEC-12 for overnight intervals.
 
-**RULE-CAP-1.** Weekly availability consists of zero or more local-time intervals per weekday. Each interval MUST end after it starts and MUST NOT overlap another interval on the same weekday. v1 interprets each interval within one local day. See DEC-12 for overnight intervals.
+**RULE-CAP-2.** A date exception is keyed by local date. At most one exception exists per date. Setting an exception for an existing date replaces it. An `unavailable` exception removes all capacity on that date. A `replace_intervals` exception replaces the normal weekly intervals with its intervals, including their pause budgets. Removing an exception is unresolved; see DEC-11.
 
-**RULE-CAP-2.** A date exception is keyed by local date. At most one exception exists per date. Setting an exception for an existing date replaces it. An `unavailable` exception removes all capacity on that date. A `replace_intervals` exception replaces the normal weekly intervals with its intervals. Removing an exception is unresolved; see DEC-11.
+**RULE-CAP-3.** Capacity expansion processes each local calendar day in the horizon. It applies the date exception if present, otherwise the weekly rules. If a recorded capacity override exists for the current local day, the override's window replaces that day's working window for planning. It converts local wall times to absolute instants using the configured timezone. It subtracts each interval's pause budget from that interval, without placing the pause at a fixed time. It clips the start to the current time and the end to the horizon. It sorts intervals and merges touching or overlapping schedulable intervals.
 
-**RULE-CAP-3.** Capacity expansion processes each local calendar day in the horizon. It applies the date exception if present, otherwise the weekly rules. It converts local wall times to absolute instants using the configured timezone. It clips the start to the current time and the end to the horizon. It sorts intervals and merges touching or overlapping intervals.
-
-**RULE-CAP-4.** If the current time is inside a working interval, capacity begins now. If it is before the interval, capacity begins at the interval start. If it is after the interval, that interval contributes no capacity.
+**RULE-CAP-4.** If the current time is inside a working interval, capacity begins now and the interval's full pause budget stays reserved. If it is before the interval, capacity begins at the interval start. If it is after the interval, that interval contributes no capacity.
 
 **RULE-CAP-5.** Local wall-clock times are authoritative across daylight-saving transitions. An interval that spans a transition has the actual elapsed duration implied by the timezone rules. The application MUST NOT assume every local day has 24 hours.
 
 **RULE-CAP-6.** The default planning horizon is 90 calendar days. The user can configure 7 to 365 calendar days. The itinerary covers the horizon or stops earlier when all eligible work is allocated. Capacity outside the horizon is not used for itinerary allocation. Forecast treatment of deadlines beyond the horizon is unresolved; see DEC-5.
 
 **RULE-CAP-7.** If no working availability is configured, the application MUST show a persistent `no_working_hours` setup warning and MUST NOT fabricate an itinerary.
+
+**RULE-CAP-8.** A pause budget is a reserve for breaks the user takes without scheduling them ahead of time. It MUST NOT appear as an itinerary item or be assigned a fixed time. The itinerary schedules at most the capacity that remains after the reserve. The reserve is a planning allowance, not a tracked balance. A break shorter than the budget leaves capacity unused; a break longer than the budget consumes planned work time, so later items slip and may become unscheduled or missed. The application displays pause budgets separately from allocated work. If the user works through the reserve, the extra time is actual logged work, not an automatic change to the availability configuration.
 
 ### 5.7 Dependency closures
 
@@ -997,13 +1139,13 @@ The rules in this section are referenced by the stories. They define the observa
 
 **RULE-CLOS-3.** Completed tasks are not in a closure. A cancelled, inbox, paused-project, completed-project, missing, or otherwise unresolvable prerequisite makes the path blocked. It is not counted as work to perform. A shared prerequisite is counted once.
 
-**RULE-CLOS-4.** Closure effort is the sum of remaining minutes, with unfinished zero-effort tasks counted as five minutes. It is not the sum of original estimates.
+**RULE-CLOS-4.** Closure effort is the sum of remaining minutes, with unfinished zero-effort tasks counted as five minutes. It is not the sum of original estimates. Unallocated closure effort is closure effort minus minutes already allocated for the closure earlier in the same projection.
 
 **RULE-CLOS-5.** A dependency cycle in the stored graph prevents a valid itinerary. The application MUST report the cycle with its path and MUST NOT produce a partial plan.
 
 ### 5.8 Slack and risk
 
-**RULE-SLACK-1.** For a deliverable with an effective deadline, `slack = capacity minutes from now until the effective deadline - closure effort`. Capacity is clipped to now and to the planning horizon. For a deliverable with no deadline, slack is null, not zero and not a sentinel.
+**RULE-SLACK-1.** For a deliverable with an effective deadline, `slack = capacity minutes from now until the effective deadline - unallocated closure effort`. Capacity is measured after pause budgets are subtracted and is clipped to now and to the planning horizon. For a deliverable with no deadline, slack is null, not zero and not a sentinel.
 
 **RULE-SLACK-2.** Slack is a per-deliverable feasibility measure. It does not subtract work allocated to other deadline closures. It answers whether this closure could fit in the capacity before its deadline if it had that capacity to itself. Aggregate contention is covered by the `plan_over_capacity` warning.
 
@@ -1045,15 +1187,15 @@ Within a tier:
 
 **RULE-ORDER-3.** The application re-evaluates the candidate set after every allocation chunk, not only at working-interval boundaries. A task can receive several consecutive chunks or be replaced by more urgent work.
 
-**RULE-ORDER-4.** The system owns the itinerary order. v1 has no manual pins, drag reordering, or protected focus blocks.
+**RULE-ORDER-4.** The system owns the itinerary order by default. v1 has no manual pins, drag reordering, or protected focus blocks. An explicit ordering override MAY move a chosen task earlier, including ahead of work already scheduled, or treat it as next. The override applies to one action, is visible and recorded, and does not create a persistent user-owned order.
 
 **RULE-ORDER-5.** Input order MUST NOT affect the result. Reordering tasks, projects, dependencies, or capacity intervals MUST produce the same itinerary and forecasts.
 
 ### 5.10 Allocation
 
-**RULE-ALLOC-1.** Allocate `min(remaining effort, 60 minutes, remaining capacity in the current interval)`. Split an allocation at the current interval boundary. Never allocate outside capacity or beyond remaining effort.
+**RULE-ALLOC-1.** Allocate `min(unallocated effort, 60 minutes, remaining capacity in the current interval)`. Split an allocation at the current interval boundary. The application MUST NOT allocate outside capacity or beyond unallocated effort.
 
-**RULE-ALLOC-2.** Sixty minutes is a maximum chunk, not a target. A task with less remaining effort or less available capacity receives a shorter item.
+**RULE-ALLOC-2.** Sixty minutes is a maximum chunk, not a target. A task with less unallocated effort or less available capacity receives a shorter item.
 
 **RULE-ALLOC-3.** A task with zero remaining effort receives a five-minute completion slot, then is treated as fully allocated for the rest of the horizon. The slot is created only when the task is otherwise eligible. If the current capacity interval has fewer than five minutes left, the task waits for a later interval; the slot is not shortened.
 
@@ -1061,7 +1203,7 @@ Within a tier:
 
 **RULE-ALLOC-5.** Each itinerary item has the task, start, end, allocated minutes, a machine-readable reason, and a human-readable explanation. The item MUST NOT extend beyond the capacity interval that contains it.
 
-**RULE-ALLOC-6.** If no eligible task can be chosen, the capacity is left unused. The application MUST NOT fill it with ineligible work.
+**RULE-ALLOC-6.** If no eligible task can be chosen, the capacity is left unused. The application MUST NOT fill it with ineligible work under normal rules. An explicit dependency override MAY start a blocked task, and the item is marked as overridden.
 
 ### 5.11 Forecasts
 
@@ -1074,6 +1216,8 @@ Within a tier:
 **RULE-FCAST-4.** A forecast explanation MUST state the risk, the closure effort, the slack when a deadline exists, and the effective deadline. For missed, it MUST state the shortfall, which is the amount by which closure effort exceeds the capacity before the deadline. For blocked, it MUST name the unresolvable prerequisite. For unscheduled, it MUST say that no finish can be projected within the horizon.
 
 **RULE-FCAST-5.** Forecasts are projections. They are not persisted as the authoritative plan and MUST be recomputed with the itinerary.
+
+**RULE-FCAST-6.** Forecasts are a supporting view. They MUST NOT replace, outrank, or block the itinerary. The itinerary remains available and primary when no forecast exists or when forecast data is unavailable.
 
 ### 5.12 Reasons and explanations
 
@@ -1108,11 +1252,19 @@ The severity mapping is a suggestion, not fully specified; see DEC-8.
 
 **RULE-WARN-2.** Warnings are first-class state. They are not transient toasts. A warning is stable for the same condition and entity, so it updates rather than duplicates. It resolves automatically when a recalculation finds the condition false. No manual dismissal action is specified.
 
-**RULE-WARN-3.** Today lists warnings critical first, then warnings, then informational items. The tray popup shows critical warnings. A warning does not change data and does not block a valid action.
+**RULE-WARN-3.** Today lists warnings critical first, then warnings, then informational items. The tray popup shows critical warnings. Critical warnings and estimate overruns MAY also produce notifications when enabled, and approaching deadlines MAY once DEC-16 defines that trigger. A warning does not change data and does not block a valid action.
 
 **RULE-WARN-4.** If no working hours are configured, the application shows the setup warning and does not fabricate an itinerary. If a deadline path is blocked, the risk is blocked and the missing or ineligible prerequisite is named. If total work exceeds horizon capacity, the application warns that some work is unscheduled.
 
 **RULE-WARN-5.** A warning is a projection, not a guarantee.
+
+**RULE-NOTIF-1.** Notifications are opt-in by category. The supported categories are critical warnings, estimate overruns, and approaching deadlines once DEC-16 defines that trigger. The user can set quiet hours and control the platform notification permission. Quiet hours are a local-time window in the configured timezone; a window whose end is before its start crosses midnight. During quiet hours the application suppresses delivery, and a condition that is still true when the window ends is delivered then. A notification MUST respect those settings.
+
+**RULE-NOTIF-2.** The application delivers at most one notification per condition and entity. It MUST deduplicate repeated recalculation of the same condition. When the condition resolves, the notification is withdrawn or marked resolved and MUST NOT fire again for the same condition.
+
+**RULE-NOTIF-3.** A notification is delivery, not planning state. The warning MUST remain visible in the application and tray. A notification MUST NOT be the only place a warning appears, and dismissing a notification MUST NOT dismiss the warning.
+
+**RULE-NOTIF-4.** A denied permission, unsupported platform, or delivery failure MUST be reported without blocking planning. The application MUST NOT repeatedly prompt for permission after a denial.
 
 ### 5.14 Recalculation and refresh
 
@@ -1134,9 +1286,31 @@ The severity mapping is a suggestion, not fully specified; see DEC-8.
 
 **RULE-PRED-1.** A forecast is a prediction from current data. The application MUST describe deadlines as projected, at risk, tight, missed, blocked, or unscheduled. It MUST NOT promise that a deadline will be met.
 
-### 5.17 Worked examples
+### 5.17 Overrides
 
-The examples use explicit times and a fixed local timezone. All arithmetic is in whole minutes. They are illustrative; the rules above govern any input. The reason on the last remaining item in an example is trivial by construction; DEC-7 covers selections that only a stable tie-breaker decides.
+**RULE-OVERRIDE-1.** An override is explicit, confirmed, recorded, and scoped to one action. It MUST identify the actor, target, affected rule, time, and optional reason. It MUST remain visible on the affected task, allocation, or history entry. An override is never the default action and MUST NOT be inferred from a normal action.
+
+**RULE-OVERRIDE-2.** The overridable rules are exactly three planning constraints: dependency order, capacity boundaries for the current local day, and system-owned ordering. An override MAY start a blocked task, adjust today's working window, or move a chosen task earlier. Every other constraint is absolute: an override MUST NOT schedule an inbox task, a task without a positive estimate, or a task in a paused, completed, or archived project, and MUST NOT schedule a completed or cancelled task. An override MUST NOT bypass validation or weaken security, authentication, data integrity, secret handling, destructive confirmations, or another person's data.
+
+**RULE-OVERRIDE-3.** An override does not falsify the underlying data. A blocked task remains blocked, a missing prerequisite remains missing, a paused project remains paused, and a risk remains reported. An overridden itinerary item MUST be marked as overridden and MUST NOT be presented as satisfying the normal rule or as safe.
+
+**RULE-OVERRIDE-4.** An agent override requires explicit user intent in the request and confirmation from an attached interactive surface. The service MUST forward the confirmation to the most appropriate attached surface: the desktop window when open, otherwise the tray popup. If no interactive surface is attached, the service MUST reject the override with `confirmation_unavailable` and MUST NOT self-confirm. The application MUST reject an implicit, bulk, unattributed, or unconfirmed override.
+
+**RULE-OVERRIDE-5.** A capacity override adjusts the current local day's working window: its start or its end. The adjusted window MUST remain a valid interval within that local day and MUST keep its pause budget less than its duration. It is used for planning that day only. It does not change weekly availability, date exceptions, pause budgets, or another day.
+
+**RULE-OVERRIDE-6.** An ordering override applies to one task and one action. It MAY move the task earlier, including ahead of already scheduled work, or treat it as next. It expires when the task receives its next allocation or when the user cancels it, and it does not create a persistent user-owned order.
+
+### 5.18 Agent change feed
+
+**RULE-ACTIVITY-1.** The planner service maintains a durable, ordered change feed for agent-visible changes: task and project creation or update, status and completion changes, dependency changes, time-entry changes, timer changes, availability changes, overrides, and settings that affect planning. Each entry has a stable sequence position, a change kind, the affected entity, the time, the actor, and a short summary. Secrets MUST NOT appear in the feed.
+
+**RULE-ACTIVITY-2.** An agent can request changes since an opaque cursor. The response returns the changes in order, a new cursor, and a clear indication when the requested cursor is too old or unknown. The feed is durable across service restart.
+
+**RULE-ACTIVITY-3.** The change feed is a notification aid, not a replacement for authoritative reads. An agent that needs current values MUST read the affected entity or the current projection.
+
+### 5.19 Worked examples
+
+The examples use explicit times and a fixed local timezone. All arithmetic is in whole minutes. Pause budgets are zero unless an example states otherwise. They are illustrative; the rules above govern any input. The reason on the last remaining item in an example is trivial by construction; DEC-7 covers selections that only a stable tie-breaker decides.
 
 #### EX-1. Deadline pressure outranks ordinary priority
 
@@ -1152,7 +1326,7 @@ The examples use explicit times and a fixed local timezone. All arithmetic is in
 
 **Closures and slack.**
 
-- Atlas project closure: {A}, 105 minutes. Capacity to 11:00 is 120 minutes. Slack 15. 15 percent of 105 is 15.75. Since 0 is less than or equal to 15 and 15 is less than 15.75, Atlas is tight.
+- Atlas project closure: {A}, 105 minutes. Capacity to 11:00 is 120 minutes. Slack 15. 15 percent of 105 is 15.75. Slack 15 is non-negative and below 15.75, so Atlas is tight.
 - Task A forecast: same closure, slack 15, tight.
 - Task B closure: {B}, 120 minutes. Capacity to 17:00 is 300 minutes. Slack 180. 15 percent of 120 is 18. Safe.
 - Task C closure: {C}, 60 minutes. Capacity to 17:00 is 300 minutes. Slack 240. Safe.
@@ -1160,7 +1334,7 @@ The examples use explicit times and a fixed local timezone. All arithmetic is in
 **Allocation.**
 
 - A is the only task in a tight closure, so it is selected first. It is allocated 60 minutes from 09:00 to 10:00.
-- Re-evaluation: A has 45 minutes remaining. Capacity to 11:00 from 10:00 is 60. Slack 15, still tight. A is allocated 45 minutes from 10:00 to 10:45.
+- Re-evaluation: A has 45 minutes of unallocated effort. Capacity to 11:00 from 10:00 is 60. Slack 15, still tight. A is allocated 45 minutes from 10:00 to 10:45.
 - A is fully allocated. B and C are ordinary work. B has the earlier deadline (17:00, equal to C) and higher task priority (1 versus 3), so B is selected. It receives 60 minutes from 10:45 to 11:45, then 60 minutes from 11:45 to 12:45.
 - C receives 60 minutes from 12:45 to 13:45. The remaining 15 minutes of capacity are unused.
 
@@ -1291,87 +1465,153 @@ The examples use explicit times and a fixed local timezone. All arithmetic is in
 
 ---
 
-## 6. Conceptual background-service/client architecture
+#### EX-4. A pause budget reserves break time without scheduling it
 
-### 6.1 Conceptual diagram
+**Inputs.**
+
+- Current time: Tuesday 09:00.
+- Availability: Tuesday 09:00 to 12:00, pause budget 30 minutes.
+- Task D: no project, estimate 150 minutes, no deadline.
+- No dependencies, no logged work.
+
+**Capacity.**
+
+- The interval is 180 minutes. The reserve is 30 minutes, so capacity is 150 minutes.
+- No break is placed on the itinerary.
+
+**Expected itinerary.**
+
+| Start | End | Task | Minutes | Reason |
+| --- | --- | --- | --- | --- |
+| 09:00 | 10:00 | D | 60 | `task_priority` |
+| 10:00 | 11:00 | D | 60 | `task_priority` |
+| 11:00 | 11:30 | D | 30 | `task_priority` |
+
+**What it demonstrates.** The reserve reduces capacity by a fixed amount and never appears as an item. D is the only task, so its reason label is trivial. If the user takes a 30-minute break, the plan holds. If the user takes an unplanned 45-minute break at 10:00, the last 15 minutes no longer fit before 12:00 and are reported as unscheduled; the application neither extends the reserve nor moves the work automatically. If the user skips the break, the plan is unchanged and the user finishes early.
+
+---
+
+## 6. Service architecture and deployment modes
+
+v1 supports two deployment modes for the same planner service. The mode is a deployment and lifecycle choice, not a difference in planning behavior. Both modes use the same rules, the same local data, and the same projections.
+
+### 6.1 Daemon mode
+
+In daemon mode, a local background service owns validation, authoritative data, scheduling, forecasting, warnings, recalculation, and the active timer. It serves the desktop client, the tray client, and agent clients. The daemon can run without a desktop window and can outlive the desktop interface. It starts at login where supported or on explicit request. In v1 the daemon is local to the user's computer and is not exposed to the network.
+
+The desktop and tray are clients. They connect to the daemon, display shared state, and send explicit requests. Closing or quitting the interface does not stop the daemon. Stopping the daemon is a separate explicit action.
+
+### 6.2 Single-process mode
+
+In single-process mode, one process owns the planner service, the desktop window, and the tray. MCP is the only interface that leaves the process. There is no separate API listener. Closing the main window hides it and keeps the process, timer, tray, and agent access alive. Quitting the process stops the service and agent access.
+
+### 6.3 Conceptual diagram
 
 ```text
-Desktop window ------+
-Tray popup/menu -----+--> Planner service ---> Local planning data
+Daemon mode
+
+Desktop client ------+
+Tray client ---------+--> Local daemon ---> Local planning data
 Agent client --------+          |
-   (MCP)                        +--> Optional tracker integration --> External trackers
-                                |                                    (read-only context)
-                                +--> scheduling, forecasts, warnings
+   (MCP)                        +--> scheduling, forecasts, warnings,
+                                     timer, change feed
+
+Single-process mode
+
+Desktop window ------+
+Tray icon/menu ------+--> Planner service (same process) --> Local planning data
+Agent client --------+          |
+   (MCP)                        +--> scheduling, forecasts, warnings,
+                                     timer, change feed
 ```
 
-### 6.2 Responsibilities
+The diagram is conceptual. It does not prescribe transport, framing, endpoints, ports, process names, or internal interfaces.
+
+### 6.4 Responsibilities
 
 | Component | Responsibility | What it MUST NOT do |
 | --- | --- | --- |
-| Desktop window | Present Today, Tasks, Projects, Review, and Settings; collect input; show results and errors. | Compute its own schedule, forecast, or validation rules. |
+| Planner service | Validate, persist, schedule, forecast, warn, recalculate, own the timer, and coordinate atomic changes. | Let any surface bypass its rules or become a second data owner. |
+| Daemon host (daemon mode) | Own the service process, data ownership, startup, single-instance behavior, and shutdown. | Let a second daemon write the same data. |
+| Desktop client (daemon mode) | Present Today, Tasks, Projects, Review, and Settings; collect input; show results and errors. | Compute its own schedule, forecast, or validation rules; write the data store directly. |
+| Desktop window and service (single-process mode) | Present the interface and host the service in one process. | Split into two competing planners or expose an unintended second interface. |
 | Tray icon, menu, and popup | Present current task, timer, next work, and critical warnings; offer quick actions. | Keep a divergent plan or bypass the service. |
-| Agent client | Read and write through the local MCP interface using explicit identifiers. | Open the local data store directly, guess targets, or make implicit batch changes. |
-| Planner service | Validate, persist, schedule, forecast, warn, recalculate, and coordinate atomic changes. | Let any surface bypass its rules. |
-| Local planning data | Durable authoritative records for tasks, projects, dependencies, time, availability, attachments, and settings. | Be written by the desktop, tray, or agent adapters directly. |
-| Tracker integration | Perform optional read-only remote searches and fetches for configured plugins; cache attachment metadata. | Write to remote trackers or change local planning fields. |
-| External tracker | Supply remote context chosen by the user. | Become authoritative for local estimates, priority, status, or completion. |
+| Agent client | Read and write through MCP using explicit identifiers and explicit overrides. | Open the local data store directly, guess targets, make implicit batch changes, or start a competing service. |
+| Local planning data | Durable authoritative records for tasks, projects, dependencies, time, availability, overrides, and settings. | Be written by desktop, tray, or agent adapters directly, or by two service owners at once. |
+| Tracker integration (v2 advisory) | Perform optional read-only remote searches and fetches for configured plugins; cache attachment metadata. | Write to remote trackers or change local planning fields. |
 
-### 6.3 Shared state and cross-surface effects
+### 6.5 Shared state and cross-surface effects
 
-All surfaces share one authoritative planning state:
+All surfaces in either mode share one authoritative planning state:
 
 - A task created or changed in the desktop interface is visible to the tray and to agents after the current projection is recomputed.
 - A task created or changed by an agent is visible in the desktop and tray after refresh.
-- Starting or stopping a timer in one surface changes the current task everywhere.
+- Starting or stopping a timer in one surface changes the current task everywhere because the service owns the timer.
 - Logging, editing, or deleting time in one surface changes remaining effort and every forecast.
-- Changing availability, deadlines, priorities, or dependencies in one surface changes the itinerary and warnings everywhere.
-- Attaching, refreshing, or detaching tracker context changes only the local attachment view. It does not change the itinerary.
+- Changing availability, deadlines, priorities, dependencies, or overrides in one surface changes the itinerary and warnings everywhere.
+- The agent change feed reports the same changes that the other surfaces see.
+- An agent-requested override is confirmed on an attached interactive surface; when none is attached, the service rejects it with `confirmation_unavailable`.
+- In v2, attaching, refreshing, or detaching tracker context changes only the local attachment view. It does not change the itinerary.
 - A surface MUST NOT keep a private schedule or a private validation rule set. Presentation caches are allowed only if they refresh from the service and MUST NOT override it.
 
-### 6.4 Lifecycle
+### 6.6 Lifecycle
 
-**Startup.** The application starts the planner service before exposing window or tray operations. It applies any required data upgrades, loads settings and local data, and computes the current projection. No account or network connection is required.
+**Daemon mode startup.** The daemon starts at login where supported or on explicit request. It acquires sole ownership of the local data, applies required data upgrades, loads settings, and computes the current projection. The desktop and tray connect when they start. No account or network connection is required.
+
+**Daemon mode interface close or quit.** Closing the window hides the desktop client. Quitting the interface disconnects the client. The daemon, timer, and agent access remain available. Stopping the daemon is a separate explicit action.
+
+**Daemon mode stop.** Stopping the daemon shuts down the service and releases data ownership. Agents then receive a clear unavailable-service error. Local data remains. The behavior of an active timer across a stop, restart, or crash is unresolved; see DEC-4.
+
+**Single-process startup.** The process starts the planner service before exposing window or tray operations. It acquires sole ownership of the local data, applies required data upgrades, loads settings, and computes the current projection.
+
+**Single-process window close or quit.** Closing the main window hides it. The process, tray, timer, and agent access remain alive. Quitting the process stops the service and agent access. Local data remains. The behavior of an active timer across service stop, restart, or crash is unresolved; see DEC-4.
 
 **Opening the window.** The window shows the current shared state. Opening it does not create a second service or a second plan.
 
-**Closing the main window.** Closing hides the window. It does not quit the application. The tray remains, the timer continues, and agent access remains available while the application is running.
+**Restarting.** Local data and settings are preserved. The service recomputes the projection. The active-timer behavior across shutdown is unresolved.
 
-**Quitting.** Quit is an explicit action from the tray. It stops the application and its planner service. Agents then receive a clear unavailable-service error. Local data remains. The behavior of an active timer across quit, restart, or crash is unresolved; see DEC-4.
+**Switching modes.** The current service owner MUST stop and release the data before the other mode starts. The new mode loads the same data and computes the same projection. Two service owners MUST NOT write the same data at once.
 
-**Restarting.** Local data and settings are preserved. The application recomputes the projection. The active-timer behavior across shutdown is unresolved.
+**Service unavailable to an agent.** The agent receives a clear unavailable-service response. It MUST NOT open the data store directly, start a competing service, or fabricate a plan.
 
-**Service unavailable to an agent.** The agent receives a clear "application not running" response. It MUST NOT open the data store directly, start a headless service, or fabricate a plan. Headless service mode is not a v1 capability.
+**Service failure inside a running service.** The desktop and tray MUST report the problem and MUST NOT compute their own fallback schedule.
 
-**Service failure inside a running application.** The desktop and tray MUST report the problem and MUST NOT compute their own fallback schedule.
-
-### 6.5 Established service facts and open architectural decisions
+### 6.7 Established service facts and open architectural decisions
 
 This specification establishes that:
 
-- There is one planner service, owned by the desktop application, that is the single authority for rules and data.
-- The desktop window and tray are clients of that service, not independent planners.
-- Agents reach the same service through a local MCP interface.
-- The application remains resident when its main window is closed, so the tray and timer continue.
-- Quitting the application stops agent access.
-- There is no headless, always-running service mode in v1.
+- There is one planner service that is the single authority for rules and data.
+- v1 supports daemon mode and single-process mode.
+- Daemon mode can run headless and can outlive the desktop interface.
+- Single-process mode owns the service, window, and tray in one process, and MCP is its only external interface.
+- In both modes, desktop and tray surfaces are clients of the service, not independent planners.
+- Agents reach the same service through MCP.
+- Only one service owner MUST write the local data at a time.
+- A server-hosted daemon reachable over a network is a future possibility, not a v1 requirement.
 
-This specification does not establish that the service runs as an independent daemon after the desktop application quits. A resident desktop application service satisfies the need for a background service while the application runs. A separately running daemon that survives quit is a possible future architecture, not a v1 requirement. This is DEC-3.
+This specification does not settle which mode is the default installation. That is DEC-3.
 
-This specification does not prescribe transport, framing, endpoints, ports, process count, or internal interfaces. The implementation MAY choose those, provided that all surfaces share one authority, changes are atomic, and agents cannot access the data store directly.
+This specification does not prescribe transport, framing, endpoints, ports, process count, or internal interfaces. The implementation MAY choose those, provided that all surfaces share one authority, changes are atomic, agents cannot access the data store directly, and only one owner writes the data.
 
-### 6.6 Architecture rules
+### 6.8 Architecture rules
 
-**RULE-ARCH-1.** One planner service is the single authority for validation, authoritative data, scheduling, forecasting, warnings, and recalculation. Desktop, tray, and agent surfaces MUST use it. They MUST NOT compute their own schedule, validation, or forecast, and they MUST NOT access the authoritative data directly.
+**RULE-ARCH-1.** One planner service is the single authority for validation, authoritative data, scheduling, forecasting, warnings, recalculation, and the active timer. Desktop, tray, and agent surfaces MUST use it. They MUST NOT compute their own schedule, validation, or forecast, and they MUST NOT access the authoritative data directly.
 
 **RULE-ARCH-2.** Every surface applies the same rules to the same data. A change through the desktop, tray, or agent interface MUST produce the same result for identical input and state. There MUST be no entry-point-specific semantics.
 
 **RULE-ARCH-3.** After a successful change and its recalculation, all open surfaces reflect the new state. A surface MUST NOT keep a divergent plan. Presentation caches are allowed only if they refresh from the service and MUST NOT override it.
 
-**RULE-ARCH-4.** The desktop application hosts the service. Closing the main window hides it and keeps the service, tray, timer, and agent access alive. Quitting stops the service and agent access. A restart preserves local data and recomputes the projection. If the service is unavailable, surfaces report the problem and do not fabricate a plan.
+**RULE-ARCH-4.** In daemon mode, the daemon owns the service and data, can run without a desktop window, and can outlive the desktop interface. Closing or quitting the interface MUST NOT stop the daemon. Stopping the daemon is an explicit action that ends agent access. The active timer belongs to the daemon, subject to DEC-4.
+
+**RULE-ARCH-5.** In single-process mode, one process owns the service, desktop window, and tray. MCP is the only external interface. Closing the main window hides it and keeps the service, tray, timer, and agent access alive. Quitting the process stops the service and agent access.
+
+**RULE-ARCH-6.** Mode switching requires stopping the current service owner before starting the other mode. The new mode loads the same data and produces the same projection. Two service owners MUST NOT write the same data at once. Mode is a deployment choice, not a separate planning semantics.
 
 ---
 
-## 7. Plugin and external-tracker capabilities
+## 7. V2 advisory: plugin and external-tracker capabilities
+
+**Status: v2 only and advisory.** Nothing in this section is a v1 requirement. It is retained so that a future implementation has context, but a v1 implementation is not bound by it.
 
 ### 7.1 Purpose and user value
 
@@ -1393,8 +1633,8 @@ Read-only does not mean the local attachment is immutable. The user can attach, 
 
 ### 7.3 Setup and configuration
 
-- The user installs a tracker plugin locally. v1 does not auto-download or install plugins from the network.
-- v1 supports one configured connection per plugin.
+- The user installs a tracker plugin locally. The plugin implementation does not auto-download or install plugins from the network.
+- The plugin implementation supports one configured connection per plugin.
 - Settings lists discovered plugins, their enabled or disabled state, their configuration, and their last error.
 - The user supplies the plugin's non-secret configuration and any secret credentials.
 - A plugin with incomplete or invalid configuration MUST NOT be enabled.
@@ -1409,7 +1649,7 @@ Read-only does not mean the local attachment is immutable. The user can attach, 
 
 **Attach.** The user chooses one result and attaches it to an explicit local task. The application fetches or accepts the remote item's normalized metadata and stores a local attachment with the attach time and last-refresh time. The remote fields are labeled read-only. Attaching MUST NOT change the local task's estimate, priority, dependencies, status, or completion, and MUST NOT recalculate the itinerary. If the same remote item is already attached to another local task, the application requires explicit confirmation before attaching it again.
 
-**Refresh.** The user can refresh one attachment. Refreshing updates only the cached remote title, status, URL, and update time. It is a remote read. It does not change local planning fields or the itinerary. v1 does not poll in the background and does not refresh automatically.
+**Refresh.** The user can refresh one attachment. Refreshing updates only the cached remote title, status, URL, and update time. It is a remote read. It does not change local planning fields or the itinerary. The plugin implementation does not poll in the background and does not refresh automatically.
 
 **Detach.** The user can detach an attachment with explicit confirmation. Detaching removes the local link only. It does not change the remote item.
 
@@ -1421,8 +1661,8 @@ Read-only does not mean the local attachment is immutable. The user can attach, 
 - A plugin search, refresh, timeout, resource-limit termination, malformed response, missing plugin, disabled plugin, or capability denial is reported as a contained error. Local planning remains fully usable.
 - Disabling a plugin does not remove existing local attachments. Their cached metadata remains visible; search and refresh become unavailable until the plugin is enabled again.
 - A plugin response is untrusted. The application MUST validate it and render remote text as plain text, not executable or active content.
-- v1 has no production tracker integration requirement. The core product MUST be usable with no plugin installed.
-- v1 has no background polling, no remote writes, no auto-download, no plugin marketplace, and no multi-connection configuration per plugin.
+- v2 has no production tracker integration requirement. The core product remains usable with no plugin installed.
+- v2 has no background polling, no remote writes, no auto-download, no plugin marketplace, and no multi-connection configuration per plugin.
 - Attachment changes do not trigger itinerary recalculation because they are contextual only.
 
 ### 7.6 Credentials and trust
@@ -1439,7 +1679,7 @@ Read-only does not mean the local attachment is immutable. The user can attach, 
 
 **RULE-PLUG-1.** A plugin is read-only with respect to remote systems. It can search and fetch remote items. It MUST NOT create, edit, comment on, transition, or otherwise write remote data. A local change MUST NOT write to a remote tracker. A remote status MUST NOT automatically change a local task's status, estimate, priority, dependencies, or completion.
 
-**RULE-PLUG-2.** The user installs and configures a plugin locally. v1 supports one configured connection per plugin, MUST NOT auto-download plugins, and MUST NOT execute a disabled plugin. A plugin with invalid or incomplete configuration MUST NOT be enabled. Settings shows the plugin's state, configuration, and last error.
+**RULE-PLUG-2.** The user installs and configures a plugin locally. v2 supports one configured connection per plugin, MUST NOT auto-download plugins, and MUST NOT execute a disabled plugin. A plugin with invalid or incomplete configuration MUST NOT be enabled. Settings shows the plugin's state, configuration, and last error.
 
 **RULE-PLUG-3.** Tracker operations are explicit. The user or agent selects one configured plugin; the application MUST NOT search all trackers implicitly. Search returns candidates without attaching them. Attaching requires an explicit local task and remote item. Refreshing updates only cached metadata. Detaching removes only the local link. Attachment changes do not trigger itinerary recalculation.
 
@@ -1455,7 +1695,7 @@ Read-only does not mean the local attachment is immutable. The user can attach, 
 
 - All planning data is stored locally on the user's computer.
 - The core product works without an account, sign-in, cloud service, or network connection.
-- Optional tracker integrations MAY use the network. They are never required for tasks, projects, availability, scheduling, forecasts, time tracking, warnings, or data export.
+- In v2, optional tracker integrations MAY use the network. They are never required for tasks, projects, availability, scheduling, forecasts, time tracking, warnings, notifications, or data export. v1 uses no network connection for core planning.
 - This specification does not define telemetry, analytics, encryption at rest, synchronization, import, automatic backup, or recovery services. The implementation MUST NOT claim them.
 - This specification does not require encryption at rest. The local data is protected by the operating system's user account.
 
@@ -1463,17 +1703,17 @@ Read-only does not mean the local attachment is immutable. The user can attach, 
 
 - All planning data lives in a user-visible local data location.
 - The user can start an export from Settings. The export is a documented, portable representation of the user's planning data.
-- The export excludes plugin secrets.
-- Application upgrades MUST preserve existing tasks, projects, dependencies, time entries, availability, attachments, and settings. A failed upgrade MUST NOT silently discard data.
-- Copying the local data location while the application is not running preserves the user's data. This is a backup-friendly property, not a synchronization feature.
-- Restarting the application preserves data and settings and recomputes the plan.
-- Tracker secrets are not part of the local planning data or the export. Moving data to another machine or operating-system account may require re-entering tracker credentials.
+- In v2, the export excludes plugin secrets. In v1 there are no plugin secrets or attachment records in the export.
+- Application upgrades MUST preserve existing tasks, projects, dependencies, time entries, availability, overrides, and settings. In v2 they also preserve attachments. A failed upgrade MUST NOT silently discard data.
+- Copying the local data location while no service owner is running preserves the user's data. This is a backup-friendly property, not a synchronization feature.
+- Restarting the service or application preserves data and settings and recomputes the plan.
+- Tracker secrets are not part of the local planning data or the export. In v2, moving data to another machine or operating-system account may require re-entering tracker credentials.
 
-**RULE-DATA-1.** The core product is local-first and offline capable. All planning data is stored locally. The core works without an account, sign-in, cloud service, or network. Optional tracker integrations MAY use the network but are never required.
+**RULE-DATA-1.** The core product is local-first and offline capable. All planning data is stored locally. The core works without an account, sign-in, cloud service, or network. In v2, optional tracker integrations MAY use the network but are never required.
 
-**RULE-DATA-2.** The local data location is visible to the user. The user can export a documented, portable representation of the planning data. Exports exclude plugin secrets. This specification does not define import, automatic backup, synchronization, encryption, or recovery services, and the application MUST NOT claim them.
+**RULE-DATA-2.** The local data location is visible to the user. The user can export a documented, portable representation of the planning data, including overrides. In v2, exports exclude plugin secrets. This specification does not define import, automatic backup, synchronization, encryption, or recovery services, and the application MUST NOT claim them.
 
-**RULE-DATA-3.** Application upgrades and restarts preserve tasks, projects, dependencies, time entries, availability, attachments, and settings. A failed upgrade or recalculation MUST NOT silently discard data or present a stale projection as current.
+**RULE-DATA-3.** Application upgrades and restarts preserve tasks, projects, dependencies, time entries, availability, overrides, and settings. In v2 they also preserve attachments. A failed upgrade or recalculation MUST NOT silently discard data or present a stale projection as current.
 
 ### 8.3 Validation and error behavior
 
@@ -1484,9 +1724,10 @@ Read-only does not mean the local attachment is immutable. The user can attach, 
 - Attempting a second active timer produces an active-timer conflict unless the request explicitly stops the current timer.
 - Completing a task with incomplete prerequisites without confirmation produces a confirmation-required result that names the prerequisites.
 - A destructive operation without confirmation is rejected.
-- An agent request when the application is not running produces a clear unavailable-service result.
+- An agent request when the planner service is unavailable produces a clear unavailable-service result.
 - No working availability produces a setup warning, not a fabricated plan.
-- Plugin failures produce a plugin-specific error and do not break local planning.
+- An override without confirmation produces a confirmation-required result that names the affected rule. An agent override with no attached interactive surface produces a `confirmation_unavailable` error.
+- In v2, plugin failures produce a plugin-specific error and do not break local planning.
 - Raw or low-level storage errors MUST NOT be shown as the user-facing explanation. The application MUST NOT leak internals while reporting a failure.
 
 ### 8.4 Atomicity and consistency
@@ -1517,7 +1758,7 @@ Read-only does not mean the local attachment is immutable. The user can attach, 
 
 - The Today view MUST distinguish at least these empty causes: no tasks, no working hours, no capacity in the horizon, all work blocked, missing estimates, and work that is ineligible because its project is paused, completed, or archived.
 - A task or project list with no records shows an empty state, not a fabricated row.
-- A tracker search with no results says so without changing data.
+- In v2, a tracker search with no results says so without changing data.
 - The application shows a persistent active-timer indicator and a count of critical warnings.
 - Saving errors appear next to the relevant field.
 - A failed refresh or recalculation is visible. The application MUST NOT silently show old values as current.
@@ -1527,21 +1768,22 @@ Read-only does not mean the local attachment is immutable. The user can attach, 
 
 v1 is complete when a user can:
 
-1. Define working hours for a week and add a one-off day off.
-2. Create projects and tasks with the required fields and attach tasks to projects.
-3. Create a dependency graph that rejects cycles with a path.
-4. See a task with an unfinished dependency kept out of actionable work until its prerequisite is completed or planned first.
-5. Define estimates, priorities, and deadlines that change the itinerary.
-6. See a project deadline pull eligible prerequisite work ahead of less urgent, higher-priority work.
-7. See an ordered itinerary that fits future working capacity and explains each item.
-8. Start, pause, complete, and time work, and see the plan update.
-9. Add, edit, and delete historical time entries and see remaining effort, itinerary, projected completion, and warnings update.
-10. See a project with insufficient capacity marked critical and explained in minutes or hours.
-11. See the tray popup show the current timer, next work, and critical warnings, and open the planner.
-12. Use an agent to create and update tasks, set dependencies, log time, start and stop work, complete tasks, and read the updated plan.
-13. Get identical schedule results from the desktop and the agent interface for identical data.
-14. Use the application offline and export or copy local data.
-15. Configure a read-only tracker plugin, search it, attach an item, refresh cached metadata, open the remote item, and detach it without any remote write.
+1. Quick-capture a task with only a title while a timer runs, without interrupting the timer or losing the task.
+2. Define working hours for a week, set a pause budget for breaks, and add a one-off day off.
+3. Create projects and tasks with the required fields and attach tasks to projects.
+4. Create a dependency graph that rejects self-edges, duplicates, and cycles with a path.
+5. See a task with an unfinished dependency kept out of actionable work until its prerequisite is completed or planned first, and use an explicit override when needed.
+6. Define estimates, semantic priorities, and deadlines that change the itinerary.
+7. See an automatically ordered itinerary that fits future working capacity after pause budgets, explains each item, and does not need hand maintenance.
+8. See supporting forecasts that explain deadline risk without replacing or outranking the itinerary.
+9. Start, pause, complete, and time work, and see the plan update. The user can take a break without scheduling it in advance.
+10. Add, edit, and delete historical time entries and see remaining effort, itinerary, projected completion, and warnings update.
+11. See warnings in the application and tray and receive operating-system notifications for enabled notification categories.
+12. See the tray popup show the current timer, next work, and critical warnings, and open the planner.
+13. Use an agent to create and update tasks, set dependencies, log time, start and stop work, complete tasks, edit scheduling inputs, request explicit overrides, and read the updated plan and change feed.
+14. Get identical schedule results from the desktop, tray, and agent interfaces for identical data.
+15. Run the planner in daemon mode without a desktop window or in single-process mode, switch modes without losing data, and keep only one service owner.
+16. Use the application offline and export or copy local data.
 
 This list is an acceptance summary, not a second feature list. The stories and rules above are authoritative.
 
@@ -1586,37 +1828,38 @@ These decisions are not settled by the current product definition. Each entry st
 
 **Suggested resolution.** Treat a date-only deadline as the end of that local day, and allow an optional time. State the interpretation in the interface so the user is not surprised.
 
-### DEC-3. Is the service an embedded desktop service or an independent daemon?
+### DEC-3. Which service mode is the default installation?
 
-**Question.** Does the planner service run only as part of the desktop application, or does it run as an independent background service that can outlive the window and the application?
+**Question.** v1 supports daemon mode and single-process mode. Which mode should a new installation use by default, and how should the user choose?
 
 **Alternatives.**
 
-- **A. Desktop-hosted service.** The service runs while the desktop application runs. Closing the window hides the application; the tray and service stay alive. Quitting stops the service. Agents cannot operate when the application is not running. This is the v1 model described here: the application starts the service, agents receive an "application not running" result, and headless service mode is out of scope.
-- **B. Independent user-session daemon.** The service starts independently, survives application quit, and lets agents work headless. The desktop becomes one client. This would require decisions about startup, single-instance behavior, shutdown, upgrades, and timer continuity.
+- **A. Daemon mode by default.** The daemon starts at login and owns the service and data. The desktop and tray are clients. Agents can work while the interface is closed. This favors always-on agent access and a stable timer, at the cost of a resident background process and a clearer separation between "quit the interface" and "stop the service".
+- **B. Single-process mode by default.** The desktop process owns the service, window, and tray. This is simpler to install and reason about, and it stops cleanly when the user quits, but agents cannot work while the application is not running.
+- **C. Ask at first run.** The user chooses the mode during setup, with a short explanation of agent availability and background behavior. The choice can be changed later by stopping one owner and starting the other.
 
-**Consequence.** Agent availability when the user quits, timer behavior, resource use, and the meaning of "quit" all differ. Under B, "quit" closes the window but not the planner. Under A, "quit" stops planning for agents.
+**Consequence.** Agent availability, startup behavior, resource use, and the meaning of "quit" differ by default. A user who expects agents to keep working after closing the window will be surprised by single-process mode. A user who expects quit to stop everything will be surprised by daemon mode.
 
-**Current treatment.** This specification assumes A for v1. The tray-close behavior, timer continuity while hidden, and unavailable-service behavior follow A. B is a possible future architecture, not an established v1 requirement.
+**Current treatment.** Both modes are established v1 capabilities. The default is not settled. The lifecycle rules in Section 6 apply to both.
 
-**Suggested resolution.** Keep A for v1. If B is desired, define the daemon lifecycle and the user's mental model of "quit" before implementation.
+**Suggested resolution.** Ask at first run and suggest daemon mode for users who want agents available while the interface is closed. Keep single-process mode as the lightweight option. Make the current mode and the Stop Service action visible.
 
-### DEC-4. What happens to an active timer on quit, restart, or crash?
+### DEC-4. What happens to an active timer on service stop, restart, or crash?
 
-**Question.** When an open timed span exists and the application quits, restarts, or crashes, does the span continue, stop, or require correction?
+**Question.** When an open timed span exists and the service stops, restarts, or crashes, does the span continue, stop, or require correction?
 
 **Alternatives.**
 
 - Keep the open entry across restart, so elapsed time includes the time the application was not running.
-- Stop the entry at graceful quit using the quit time, and prompt on next launch to confirm or adjust it.
+- Stop the entry at a graceful service stop using the stop time, and prompt on next start to confirm or adjust it.
 - Prompt on next launch to choose the end time, especially after a crash.
 - Discard an untracked interval after a crash.
 
-**Consequence.** Logged work, remaining effort, forecasts, and overrun warnings can be materially wrong. A timer that continues through a weekend would overcount work; a timer that is silently discarded would undercount it.
+**Consequence.** Logged work, remaining effort, forecasts, and overrun warnings can be materially wrong. A timer that continues through a weekend would overcount work; a timer that is silently discarded would undercount it. Daemon mode and single-process mode can differ in how long the service stays alive, so the rule MUST be stated per service stop, not per interface close.
 
-**Current treatment.** Open entries persist while the application runs. The shutdown, restart, and crash behavior is not specified.
+**Current treatment.** Open entries persist while the service runs. The service stop, restart, and crash behavior is not specified.
 
-**Suggested resolution.** Stop the timer at graceful quit and ask the user to confirm the end time on next launch. After a crash, ask whether to keep the untracked interval, stop it at the last known time, or discard it. Do not silently continue a timer across a long shutdown.
+**Suggested resolution.** Stop the timer at a graceful service stop and ask the user to confirm the end time on next start. After a crash, ask whether to keep the untracked interval, stop it at the last known time, or discard it. Do not silently continue a timer across a long shutdown.
 
 ### DEC-5. How should forecasts treat deadlines beyond the planning horizon?
 
@@ -1668,7 +1911,7 @@ These decisions are not settled by the current product definition. Each entry st
 
 ### DEC-8. Which warnings are critical, warning, or informational?
 
-**Question.** The product defines three severities and says critical warnings appear in Today and the tray. It does not map each warning type to a severity.
+**Question.** The product defines three severities and says critical warnings appear in Today and the tray. It does not map each warning type to a severity or say which warnings may produce operating-system notifications.
 
 **Alternatives.**
 
@@ -1676,11 +1919,11 @@ These decisions are not settled by the current product definition. Each entry st
 - A stricter mapping that makes only missed deadlines critical.
 - A broader mapping that makes any deadline risk above safe critical.
 
-**Consequence.** The mapping determines what appears in the tray and how alarmed the user is. If everything is critical, nothing is.
+**Consequence.** The mapping determines what appears in the tray, what may produce a notification, and how alarmed the user is. If everything is critical, nothing is.
 
 **Current treatment.** RULE-WARN-1 gives a suggested mapping and marks it as a suggestion. The mapping is not an established requirement.
 
-**Suggested resolution.** Use the suggested mapping. Reserve critical for conditions that make a commitment unachievable or prevent a plan from existing.
+**Suggested resolution.** Use the suggested mapping. Reserve critical for conditions that make a commitment unachievable or prevent a plan from existing. Let the user opt in to notifications for critical warnings and estimate overruns, and for approaching deadlines once DEC-16 defines the trigger, and keep notifications off for informational conditions.
 
 ### DEC-9. Does a prevented dependency cycle persist as a warning?
 
@@ -1702,7 +1945,7 @@ These decisions are not settled by the current product definition. Each entry st
 
 **Question.** Are tasks and projects ever hard-deleted, or are they only cancelled or archived?
 
-**Conflict.** One safety rule names delete operations for tasks, projects, and time entries and requires confirmation. The data rules say tasks and projects are not cascade-deleted and are archived or cancelled instead. The agent capability list includes cancel for tasks and status changes for projects, but not delete.
+**Conflict.** RULE-STATE-6 says tasks and projects are never permanently deleted in v1 and that only time entries can be deleted, with confirmation. P7 requires confirmation for destructive actions, and the agent capability list includes cancel for tasks and status changes for projects but not delete. An earlier draft assumed a rule that named delete for tasks and projects; no current rule does.
 
 **Alternatives.**
 
@@ -1714,7 +1957,7 @@ These decisions are not settled by the current product definition. Each entry st
 
 **Current treatment.** This specification uses no hard delete for tasks and projects. Time entries can be deleted with confirmation. The conflict is unresolved.
 
-**Suggested resolution.** Keep no hard delete in v1. If deletion is required, define exactly what happens to time entries, dependencies, and attachments before adding it.
+**Suggested resolution.** Keep no hard delete in v1. If deletion is required, define exactly what happens to time entries, dependencies, and v2 attachments before adding it.
 
 ### DEC-11. How are availability exceptions removed?
 
@@ -1742,7 +1985,7 @@ These decisions are not settled by the current product definition. Each entry st
 - Allow it by interpreting an end at or before the start as the next local day.
 - Allow it with an explicit day offset or a separate overnight rule.
 
-**Consequence.** Night-shift users cannot express their availability under the strict rule. The current model stores only a start and end local time, so crossing midnight needs an explicit convention.
+**Consequence.** Night-shift users cannot express their availability under the strict rule. The current model stores a start, an end, and a pause budget, all as local times or durations, so crossing midnight needs an explicit convention.
 
 **Current treatment.** v1 interprets each interval within one local day and requires the end to be after the start. The overnight case is unresolved.
 
@@ -1797,6 +2040,47 @@ These decisions are not settled by the current product definition. Each entry st
 
 **Suggested resolution.** Use A. If the distinction is too subtle for users, use C and show a clear "not ready" reason instead of overloading blocked.
 
+### DEC-16. Which condition defines an approaching deadline?
+
+**Question.** Notifications offer an approaching-deadlines category, but no warning type or rule defines when a deadline is approaching. What condition should raise it?
+
+**Alternatives.**
+
+- **A. A fixed lead window.** Notify when an effective deadline is within a configured lead time, for example 24 hours, and the deliverable has unfinished work.
+- **B. A risk transition.** Notify when a deliverable's risk changes from safe to tight, or when its slack falls below one working day, independently of the 15 percent threshold.
+- **C. Implementation-defined.** Leave the trigger to the implementation and document it in the settings surface, keeping the category optional.
+
+**Consequence.** Without a definition the category cannot fire, and an implementation may either invent a trigger or silently drop the category. The choice also affects deduplication and quiet-hours behavior.
+
+**Current treatment.** The category is named in Sections 2.1, 3.1, 4.2, 4.11, 4.28, and RULE-NOTIF-1, but no trigger is defined. The category is not enabled until this decision is resolved.
+
+**Suggested resolution.** Use A with a user-configurable lead time, defaulting to 24 hours, and reuse the warning deduplication rules. Keep the category off when the user has no deadlines.
+
+---
+
+## 10. V2 advisory: daily routines and future service hosting
+
+**Status: v2 only and advisory.** Nothing in this section is a v1 requirement. It is retained so that a future implementation has context, but a v1 implementation is not bound by it.
+
+### 10.1 Daily routine tasks
+
+A daily routine task is a small recurring task anchored to the start or end of a workday. Examples are a morning inbox check, a daily stand-up note, or an end-of-day shutdown checklist. The user wants the routine to appear as real work on each applicable day without creating every occurrence by hand.
+
+A v2 implementation SHOULD support:
+
+- A routine definition with a title, estimate, priority, optional project, active weekdays, and an anchor: start of the first working interval or end of the last working interval.
+- One occurrence per applicable working day. The occurrence is a real task-like planning object with its own completion and time entries, while the routine definition remains active.
+- Start-of-day routines are scheduled at the first available capacity after the pause budget is reserved. End-of-day routines are scheduled at the end of the last working interval.
+- Completion applies to that day's occurrence only. The routine remains active for the next applicable day.
+- Editing a routine affects future occurrences, not completed history.
+- A missed occurrence is reported without silently marking it complete.
+
+Open questions for v2: whether a missed routine occurrence remains in history, how routines interact with dependencies and project deadlines, whether a routine can be skipped for one day, and how many routines are practical before they crowd out the itinerary. These questions are not v1 requirements.
+
+### 10.2 Server-hosted daemon
+
+A future deployment may run the daemon on a server and let users reach it over a network. That mode would require authentication, multi-user authorization, transport security, remote data ownership, conflict handling, and a clear privacy model. It is not v1. The v1 daemon is local to the user's computer and is not exposed to the network.
+
 ---
 
 ## Appendix A. Glossary of rule and story identifiers
@@ -1805,7 +2089,7 @@ This appendix is an index only. The normative text is in the referenced sections
 
 | Prefix | Meaning |
 | --- | --- |
-| P1 to P8 | Product principles, Section 1.3 |
+| P1 to P11 | Product principles, Section 1.3 |
 | SETUP | Setup and preferences stories, Sections 4.1 and 4.2 |
 | WORK | Project and task stories, Sections 4.3 to 4.5 |
 | DEP | Dependency and blocking stories, Sections 4.6 and 4.7 |
@@ -1814,9 +2098,13 @@ This appendix is an index only. The normative text is in the referenced sections
 | DO | Active work, time, and overrun stories, Sections 4.12 to 4.14 |
 | VIEW | Task, project, and review stories, Sections 4.15 to 4.17 |
 | AGENT | Agent stories, Sections 4.18 to 4.20 |
-| TRACK | Tracker stories, Sections 4.21 and 4.22 |
+| TRACK | Tracker stories (v2 advisory), Sections 4.21 and 4.22 |
 | DATA | Data portability story, Section 4.23 |
 | APP | Tray and lifecycle stories, Sections 4.24 and 4.25 |
+| OVERRIDE | Explicit override story, Section 4.26 |
+| SERVICE | Headless service story, Section 4.27 |
+| NOTIF | Notification story, Section 4.28 |
 | RULE-* | Shared rules, Sections 5 through 8 |
-| EX-1 to EX-3 | Worked examples, Section 5.17 |
-| DEC-1 to DEC-15 | Unresolved product decisions, Section 9 |
+| EX-1 to EX-4 | Worked examples, Section 5.19 |
+| DEC-1 to DEC-16 | Unresolved product decisions, Section 9 |
+| V2 advisory | Tracker plugins (Section 7), daily routines and server hosting (Section 10) |
