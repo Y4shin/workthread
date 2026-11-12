@@ -62,3 +62,20 @@ Fixes the module boundaries, the process model, the transport, the data
 ownership and locking rules, and the lifecycle behavior that packaging must
 support. Feeds `decisions-agent-interface`, `decisions-data-lifecycle`, and
 `child-efforts`, and the scaffolding child effort.
+
+## Notes
+
+### Ordering note added after the additions grilling
+
+This task's `blocked_by` list cannot gain new blockers after creation, so
+record the ordering here: do not run before the `architecture` grilling.
+
+The architecture grilling settles the module shapes, the transport, the
+single-owner rule, and the in-process-or-daemon rule. This task then settles
+DEC-3 and DEC-4 inside that frame, plus the lifecycle details the architecture
+leaves to it.
+
+One question changes shape because of `version-order`: the default installation
+mode matters only once more than one surface exists. If the pre-v1 versions
+ship the CLI alone first, "the default mode" is a question about the daemon
+stage, not about day one. Answer it against the release plan in mind.

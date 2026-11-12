@@ -70,3 +70,22 @@ the warning always visible in the interface.
 Fixes the agent-facing contract, the change feed's shape, and the notification
 layer's rules. Feeds `child-efforts`, the child that owns the MCP interface,
 and the child that owns notifications and tray behavior.
+
+## Notes
+
+### Ordering note added after the additions grilling
+
+This task's `blocked_by` list cannot gain new blockers after creation, so
+record the ordering here: do not run before the `architecture` grilling.
+
+The additions changed this task's frame in two ways:
+
+- The CLI is a first-class v1 surface and hosts MCP over stdio. The
+  architecture grilling settles how an interactive CLI session and an MCP stdio
+  session stay separate, since one process cannot own the terminal's standard
+  streams for both. This task's surface description must match that decision.
+- The agent surface stays the same contract in both run modes, so the tool set
+  is defined once against the core service facade, not once per host.
+
+DEC-9 is still this task's only numbered decision; the rest is the surface
+design that `architecture` deliberately leaves here.

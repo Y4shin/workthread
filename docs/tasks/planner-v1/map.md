@@ -8,28 +8,35 @@ status: stable
 ## Destination
 
 Planner v1 is turned into a set of live child efforts, each with a settled
-scope, entry criteria, and a position in the implementation order. Every
-cross-cutting architecture and product decision the children depend on is
+scope, entry criteria, a position in the pre-v1 build order, and a release.
+Every cross-cutting architecture and product decision the children depend on is
 settled here and recorded in this effort's architecture document. The
-specification stays the reference text, inside this effort's directory.
+specification stays the reference text, inside this effort's directory; the
+deviations this effort settles are recorded on this map and in the
+architecture.
 
 ## Constraints
 
 - Full map before implementation: the child-effort list, their order, their
-  scopes, and their entry criteria are settled here before any child effort
-  starts.
+  scopes, their entry criteria, and their releases are settled here before any
+  child effort starts.
 - This effort owns architecture and product decisions. Child efforts own code.
 - Throwaway prototypes and spikes are allowed when a cheap artifact settles a
   question faster than prose. Nothing mergeable is produced.
-- Java 21 or newer, with three separable shapes: a core module holding the
-  work logic, a Spring Boot API module, and a JavaFX client module.
-- Both run modes are required: standalone mode with no API between daemon and
-  client, and split mode with the API between them.
+- Java 21 or newer. The build tool, Java version, and test stack are settled
+  here through the stack research task.
+- The pre-v1 build order is the command line interface, then the backend
+  logic, then MCP, then the daemon, then the desktop client, then the tray.
+- Every user-facing or external-facing interface works with the backend in the
+  same process or by talking to the daemon.
 - Child efforts are separate efforts linked by `origin_effort` on the child's
   map. They are never tickets and never `blocked_by` edges.
 - Close route: to-spec, then to-tickets for the architecture document and one
   formality ticket, then finalize on branch `effort/planner-v1`.
 - Writes under `docs/tasks/` go through the `tw_*` tools only.
+- Dependency edges are fixed at task creation, so a late ordering constraint is
+  recorded in the affected task's notes. The affected tasks are
+  `child-efforts`, `decisions-service-mode`, and `decisions-agent-interface`.
 
 ## Non-goals
 
@@ -47,7 +54,7 @@ specification stays the reference text, inside this effort's directory.
 ## Non-negotiable facts
 
 **Success test:** every child effort for planner v1 exists as a live effort
-under `docs/tasks/` with its own map, scope, entry criteria, and
+under `docs/tasks/` with its own map, scope, entry criteria, release, and
 `origin_effort: planner-v1`, and every cross-cutting architecture and product
 decision a child would otherwise have to settle is recorded in
 `docs/tasks/planner-v1/architecture.md` or in an ADR.
@@ -55,27 +62,32 @@ decision a child would otherwise have to settle is recorded in
 - The product name is workthread everywhere. "Itinerary Planner" is only the
   title of the moved specification document.
 - The reference text is `docs/tasks/planner-v1/initial_spec.md`, moved
-  verbatim and not edited.
+  verbatim and not edited. Where the decisions on this map depart from it, this
+  map and the architecture document are authoritative.
 - Java 21 or newer. The build tool, Java version, and test stack are settled
   by this effort through the stack research task and recorded in the
   architecture document.
-- Three separable shapes: a core module holding the work logic, a Spring Boot
-  API module, and a JavaFX client module.
-- Both run modes are requirements: standalone mode with no API between daemon
-  and client, and split mode with the API between them.
-- Work logic belongs to the core. The API module and the client never hold it,
-  so standalone mode needs no fork of it.
-- One planner service is the single authority for validation, authoritative
-  data, scheduling, forecasting, warnings, recalculation, and the active timer
-  (RULE-ARCH-1 to RULE-ARCH-6).
-- The itinerary is the primary output. Forecasts and warnings support it
-  (principle P11).
+- Shapes: a core module holding the work logic, a command line interface, an
+  MCP interface, a Spring Boot API module, a JavaFX client, and a tray.
+- Work logic belongs to the core. No other module holds it, so standalone mode
+  needs no fork of it.
+- Every user-facing or external-facing interface works with the backend in the
+  same process or by talking to the daemon, and all of them share one service
+  authority (RULE-ARCH-1 to RULE-ARCH-6).
+- The command line interface is a first-class v1 surface, shipped beside the
+  desktop client and the tray, and it hosts MCP over stdio.
+- Capacity comes from a timetable of hours per weekday plus time off recorded
+  ahead or retroactively. Today's capacity is the session: from now until the
+  planned leave time, minus the planned break minutes.
+- The primary output is the ordered today list with deadline forecasts. v1 has
+  no multi-day allocation, no clock-time blocks, and no task split across days.
+- The forecast horizon is two weeks at most, and it bounds deadline risk only.
 - Every unresolved specification decision (DEC-1 to DEC-16) is settled in this
   effort before decomposition, so no child effort re-litigates one.
 - Child efforts are separate efforts under `docs/tasks/`, recorded in this
-  map's `## Child efforts` section with scope, dependency position, and entry
-  criteria, and linked by `origin_effort` on the child's map. They are never
-  tickets and never `blocked_by` edges.
+  map's `## Child efforts` section with scope, dependency position, entry
+  criteria, and release, and linked by `origin_effort` on the child's map. They
+  are never tickets and never `blocked_by` edges.
 - The architecture document at `docs/tasks/planner-v1/architecture.md` is the
   design record child efforts copy from. It archives with this effort.
 - The single implementation ticket is a formality. It carries no
@@ -107,6 +119,25 @@ decision a child would otherwise have to settle is recorded in
 - An open-ended grilling task runs first, so the human can add requirements on
   top of the specification before any other planning task starts. Decided by
   the `non-negotiables` task.
+- The task record takes its inspiration from Taskwarrior's model, compared
+  field by field against the specification's model. The research and the
+  comparison are charted, and the comparison decides what is adopted. Decided
+  by `spec-additions`.
+- The day-by-day schedule leaves v1. A timetable of hours per weekday plus
+  time off, and a daily session with a planned leave time and break minutes,
+  replace it. The interface shows an ordered today list with a fit signal.
+  Decided by `spec-additions`.
+- Deadline pressure stays at its simplest: ordering still protects deadlines,
+  with a forecast horizon of two weeks at most. Decided by `spec-additions`.
+- The pre-v1 build order is the CLI, then the backend logic, then MCP, then the
+  daemon, then the desktop client, then the tray. A general architecture
+  grilling runs after the order is settled, and the two existing service and
+  agent grillings run after the architecture. A separate release plan runs
+  after the architecture and the child-effort list. Decided by
+  `spec-additions`.
+- The command line interface is a first-class v1 surface that hosts MCP over
+  stdio, and every interface works with the backend in process or through the
+  daemon. Decided by `spec-additions`.
 
 ## Fog
 

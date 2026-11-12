@@ -60,3 +60,27 @@ Everything after this task: to-spec, to-tickets, the one formality ticket, and
 the close, where the review triage creates one follow-up effort per accepted
 entry. A child that this task cannot scope precisely stays out of the list and
 goes in the map's `## Fog` instead.
+
+## Notes
+
+### Ordering note added after the additions grilling
+
+This task's `blocked_by` list was created before the human's additions, and
+dependency edges cannot be re-wired after creation. Treat this note as part of
+the task's preconditions:
+
+- Do not run before `task-model-comparison`: the task record the child efforts
+  build on is decided there.
+- Do not run before `session-and-timetable`: the timetable and session replace
+  the day-by-day schedule, so the scheduling scope of a child effort is not
+  the specification's itinerary scope.
+- Do not run before `architecture`: module boundaries and the
+  in-process-or-daemon rule decide what an effort can own.
+- Do not run before `version-order`: the build order decides the sequence the
+  child efforts follow.
+- `release-plan` runs after this task, so here the goal is the effort list, the
+  scopes, and the order. Assigning efforts to releases is `release-plan`'s job.
+
+The list must also reflect the human's build order: a CLI stage first, then
+backend logic, MCP, the daemon, the desktop client, and the tray. A child
+effort that cuts across stages is a signal to split it.
