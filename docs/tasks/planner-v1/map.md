@@ -138,6 +138,18 @@ decision a child would otherwise have to settle is recorded in
 - The command line interface is a first-class v1 surface that hosts MCP over
   stdio, and every interface works with the backend in process or through the
   daemon. Decided by `spec-additions`.
+- The stack is evidenced, not guessed, by the `stack-research` task: Java 21,
+  Gradle 9.9.1, the MCP Java SDK 2.1.0 over stdio, SQLite through sqlite-jdbc
+  in WAL mode with one writer, JUnit 5 and AssertJ, and a JavaFX image where
+  JavaFX stays on the module path because classpath loading is unsupported.
+  The architecture task confirms and records it; the evidence is
+  `docs/research/stack.md`.
+- Taskwarrior's task model is documented field by field by the
+  `taskwarrior-model-research` task: a flat extensible key/value record, four
+  stored statuses with `waiting` derived, one-key-per-member sets, an operation
+  log for history, a computed urgency that is never stored, and deliberately no
+  estimate, no time tracking, and no capacity. The comparison task decides what
+  workthread adopts; the evidence is `docs/research/taskwarrior-model.md`.
 
 ## Fog
 

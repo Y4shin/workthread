@@ -3,7 +3,7 @@ type: task
 subtype: research
 title: Java stack for a standalone and split-mode planner with an MCP interface
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - spec-additions
 ---
@@ -66,3 +66,90 @@ with the `type: findings` frontmatter, and a short write-back to the map.
 The three architecture-facing grillings and `child-efforts`. If the research
 finds a precise requirement that no task covers, record it as discovered work
 instead of widening this task.
+
+## Notes
+
+### Findings
+
+Full evidence, every source URL, the passage relied on, and the contradiction
+list: `docs/research/stack.md`. The record below is the decision-grade digest.
+
+**Method.** Primary sources only: the MCP Java SDK repository, Maven Central
+metadata, Spring AI and Spring Boot reference documentation, OpenJFX javadoc
+and release notes, Gradle and Maven documentation, SQLite, H2, and RocksDB
+documentation. Each claim is marked fact, inference, or assumption in the full
+file. No claim rests on a search summary.
+
+**Recommendation.**
+
+| Slot | Pick |
+| --- | --- |
+| Java | 21 LTS, pinned by toolchain |
+| Build tool | Gradle 9.9.1, Kotlin DSL, per-module toolchains |
+| Modules | `core`, `mcp-adapter`, `daemon`, `api`, `apiclient`, `client`, `cli`, `standalone`, `testkit` |
+| MCP library | `io.modelcontextprotocol.sdk:mcp` 2.1.0 (MIT), `StdioServerTransportProvider` |
+| Spring | Spring Boot 4.x in `api` and `daemon` only, no JavaFX in that JVM |
+| Persistence | SQLite via `org.xerial:sqlite-jdbc` 3.54.1.0, WAL, `busy_timeout`, one writer thread |
+| Tests | JUnit 5 and AssertJ for core; JavaFX headless platform for a thin UI smoke layer |
+| Packaging | `jlink` or `jpackage` image, JavaFX always on the module path |
+
+**The load-bearing facts.**
+
+- MCP Java SDK: `io.modelcontextprotocol.sdk:mcp`, MIT, Java 17+, versions
+  2.0.0, 2.0.1, 2.1.0 stable with 2.2.0 milestones. The core module ships
+  STDIO, SSE, and Streamable HTTP server transports with no web framework.
+  Spring-specific transports moved to Spring AI 2.0+ (`spring-ai-starter-mcp-server`).
+  Registry `<latest>` is a milestone, so pin 2.1.0.
+- JavaFX must load from named modules on the module path; classpath loading is
+  documented as unsupported. Consequence: a Spring Boot executable jar cannot
+  host JavaFX. `Platform.startup` is the supported way to start the toolkit from
+  a non-JavaFX main, and `Application.launch` may only be called once and not
+  from the FX thread.
+- Gradle's multi-project model is documented as the structure for work
+  avoidance and parallel builds; its JavaFX plugin is variant-aware and current.
+  Maven's official JavaFX plugin is at 0.0.8 from October 2021, and Maven 4 is
+  still a release candidate.
+- Headless JavaFX: JavaFX 26 release notes add a headless Glass platform
+  selected with `-Dglass.platform=headless`, with no extra artifact. JavaFX 25
+  has neither. TestFX and its Monocle artifact have had no release since
+  February 2024 and stop at JavaFX 21.
+- SQLite WAL: readers do not block the writer and the writer does not block
+  readers, with exactly one writer at a time, and it does not work over a
+  network filesystem. `busy_timeout` and `locking_mode` are the documented
+  controls. H2 embedded allows one virtual machine at a time with a lock file.
+  RocksDB cannot be written from more than one process.
+
+**Consequences to record as non-negotiables.**
+
+- `core` declares no Spring and no JavaFX dependency. Enforce it with a build
+  check, or standalone mode drifts into needing Spring.
+- Both run modes assemble from the same modules: standalone takes `core` plus
+  `mcp-adapter` plus `client`; split takes `core` plus `mcp-adapter` plus `api`
+  plus `daemon`, with `client` talking through `apiclient`.
+- A Spring Boot fat jar is not a supported JavaFX host, so packaging is an
+  image, not a single jar.
+
+**What would change if a pick proves wrong.** The MCP version can be pinned and
+isolated behind `mcp-adapter`. Spring AI can be added to the daemon modules
+alone. The JavaFX packaging constraint is the highest-cost reversal, which is
+why it is treated as a constraint. Gradle's packaging path can be replaced by
+`jpackage` driven from a task, without changing the module layout. SQLite can
+fall back to H2 at the cost of a migration and losing file inspectability.
+
+**Thin evidence, stated plainly.**
+
+- The minimum JDK for JavaFX 26 is not documented on any page verified, so
+  "JavaFX 26 for the headless platform" may conflict with "Java 21".
+- Whether Monocle still works against JavaFX 21.0.13 is untested.
+- Tray icon: not researched. JavaFX has no system tray API; the options are the
+  AWT tray or a third-party library. Nothing in the current plan covers it.
+- CLI argument parsing: not researched.
+- No measured CI cost comparison between Maven and Gradle.
+- No spike proving a JavaFX client and a Spring Boot daemon can share the same
+  DTO jar without module-path conflicts.
+
+**Contradictions found.** The SDK repository changelog is stale against Maven
+Central. Central marks a milestone as `<latest>`. The OpenJFX javadoc forbids
+classpath loading while the OpenJFX Maven plugin documents a classpath launch.
+TestFX still presents Monocle as the headless route while JavaFX 26 ships its
+own.
