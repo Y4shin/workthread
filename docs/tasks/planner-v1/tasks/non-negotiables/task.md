@@ -3,7 +3,7 @@ type: task
 subtype: grilling
 title: Settle the program effort's non-goals and non-negotiable facts
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 
@@ -124,3 +124,121 @@ code change.
   not in a child effort.
 - Scaffolding is a child effort's job. This effort may specify it.
 - The moved spec is not edited.
+
+## Notes
+
+### Settled decisions
+
+**1. Product name.** workthread everywhere. The repository and `CONTEXT.md`
+stay authoritative, and "Itinerary Planner" survives only as the title of the
+moved specification document. Rejected: renaming the product to Itinerary
+Planner (adds a rename to a child effort); workthread in code with Itinerary
+Planner in prose (two vocabularies to keep aligned). Consequence: every child
+effort names workthread.
+
+**2. Success test.** This effort is done when every child effort for planner
+v1 exists as a live effort under `docs/tasks/` with its own map, scope, entry
+criteria, and `origin_effort: planner-v1`, and every cross-cutting
+architecture and product decision a child would otherwise have to settle is
+recorded in `docs/tasks/planner-v1/architecture.md` or in an ADR.
+
+**3. Non-goals.** No product code, no build files, no CI configuration, no
+module skeleton. No implementation of any v1 capability. No v2 advisory work
+(specification sections 7 and 10). No calendar, billing, team, kanban, chat,
+plugin marketplace, or autonomous scheduling scope. No release or packaging
+work.
+
+**4. Route to the close.** to-spec writes the specification, to-tickets writes
+`architecture.md` and exactly one ticket, then finalize closes the effort on
+branch `effort/planner-v1`, merged back with `--no-ff` and pushed. The single
+ticket is a formality: it carries no implementation, it is marked
+`mode: human` so the router hard-refuses autonomous dispatch, and it exists
+only to clear the finalizable gate.
+
+Mechanism evidence gathered during the grilling:
+
+- `tw_archive_effort` and the implementation gate both refuse an effort that
+  has a spec and zero tickets ("has a spec but no tickets": ticket generation
+  has not run), so an empty ticket list cannot reach the close.
+- An effort with no spec and no tickets is finalizable, which is the rejected
+  alternative: map straight to finalize. Rejected because the human wants the
+  standard arc and the architecture document.
+- `finalize-effort` discloses `tw_create_effort`, and the tool takes
+  `origin_effort`. A `follow-up` review disposition requires a live child
+  effort whose map carries the origin slug. This is the sanctioned way to
+  create child efforts.
+- `finalize-effort` holds `tw_write_architecture`, so the close can reconcile
+  the design record.
+- This repository has no `.changeset/config.json`, so the changeset step will
+  refuse and be reported as skipped. The archive gate does not require it.
+
+**5. Decision record.** One document, `docs/tasks/planner-v1/architecture.md`,
+written by to-tickets through `tw_write_architecture` and reconciled at the
+close. Child efforts copy the parts they own. Rejected: ADRs alongside (kept
+available for a decision that later meets the ADR bar, but not the default
+home); map sections only (the map cannot carry a full design).
+
+**6. The 16 open decisions.** Grouped into five themed grillings, because one
+grilling runs per Wayfinder pass. Rejected: one task per decision (sixteen
+passes); one long grilling (too much in one sitting). Each decision belongs to
+exactly one group:
+
+- estimates and time semantics: DEC-1, DEC-13
+- forecasts, risk, and warnings: DEC-2, DEC-5, DEC-6, DEC-7, DEC-8, DEC-15,
+  DEC-16
+- service mode and lifecycle: DEC-3, DEC-4, plus the open architecture of
+  section 6.7
+- data lifecycle: DEC-10, DEC-11, DEC-12, DEC-14, plus the persistence choice
+- agent interface: DEC-9, plus the MCP surface, the change feed, agent
+  attribution, and notification delivery
+
+**7. Stack research.** One research task on the Java stack before the
+service-mode decision and the decomposition: MCP server library for Java,
+keeping the core independent of Spring, JavaFX test tooling, and the
+persistence candidates. Rejected: no research, relying on the provisional plans
+in `docs/testing.md`.
+
+**8. Build tool and test harness.** Settled in this effort, not by the
+scaffolding child, and recorded in the architecture document. Rejected:
+leaving the choice to the scaffolding child (the child would then settle a
+decision the children all depend on); recording options only (defers a
+decision the human already owns).
+
+**9. Additions first.** The human wants to add requirements on top of the
+specification before any research or decision grilling starts, so an
+open-ended grilling task runs first and every other planning task is blocked
+by it.
+
+### Child efforts
+
+Child efforts are separate efforts under `docs/tasks/`, recorded in the map's
+`## Child efforts` section with scope, dependency position, and entry
+criteria. Each is created at the close as an accepted follow-up, with
+`origin_effort: planner-v1` on its map, after a human yes. They are never
+tickets and never `blocked_by` edges.
+
+### Downstream work this creates
+
+The map was charted after this task, in dependency order:
+
+1. `spec-additions` (grilling): the human adds requirements on top of the
+   specification. Blocked by `non-negotiables`.
+2. `stack-research` (research): the Java stack. Blocked by `spec-additions`.
+3. `decisions-estimates-time` (grilling): DEC-1, DEC-13. Blocked by
+   `spec-additions`.
+4. `decisions-forecast-warnings` (grilling): DEC-2, DEC-5, DEC-6, DEC-7,
+   DEC-8, DEC-15, DEC-16. Blocked by `spec-additions`.
+5. `decisions-service-mode` (grilling): DEC-3, DEC-4, and section 6.7.
+   Blocked by `spec-additions` and `stack-research`.
+6. `decisions-data-lifecycle` (grilling): DEC-10, DEC-11, DEC-12, DEC-14, plus
+   persistence. Blocked by `spec-additions` and `stack-research`.
+7. `decisions-agent-interface` (grilling): DEC-9, the MCP surface, the change
+   feed, attribution, and notification delivery. Blocked by `spec-additions`
+   and `stack-research`.
+8. `child-efforts` (grilling): the child-effort list. Blocked by every task
+   above.
+
+### Remaining fog
+
+None beyond the tasks listed above. The child-effort list itself is the
+`child-efforts` task, not an open question.
