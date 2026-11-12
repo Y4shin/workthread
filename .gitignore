@@ -1,0 +1,16 @@
+# devenv and direnv state
+.devenv/
+.direnv/
+
+# Gradle and Java build output
+.gradle/
+build/
+out/
+bin/
+*.class
+*.jar
+
+# Editor state
+.idea/
+.vscode/
+*.iml
