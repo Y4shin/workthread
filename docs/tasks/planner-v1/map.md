@@ -84,6 +84,13 @@ decision a child would otherwise have to settle is recorded in
 - The forecast horizon is two weeks at most, and it bounds deadline risk only.
 - Every unresolved specification decision (DEC-1 to DEC-16) is settled in this
   effort before decomposition, so no child effort re-litigates one.
+- The client is delivered as a `jlink` image, not a fat jar, and JavaFX stays
+  on the module path. The build must enforce that, because the runtime only
+  warns when JavaFX is on the classpath. The image still needs the host's GTK3
+  and X11 libraries.
+- The MCP server runs only in a subcommand that owns standard input and output,
+  and no module writes to standard output in that mode. A logging default that
+  points at standard output breaks the protocol.
 - Child efforts are separate efforts under `docs/tasks/`, recorded in this
   map's `## Child efforts` section with scope, dependency position, entry
   criteria, and release, and linked by `origin_effort` on the child's map. They
@@ -150,6 +157,35 @@ decision a child would otherwise have to settle is recorded in
   log for history, a computed urgency that is never stored, and deliberately no
   estimate, no time tracking, and no capacity. The comparison task decides what
   workthread adopts; the evidence is `docs/research/taskwarrior-model.md`.
+- The client ships as a `jlink` image built by the `org.beryx.jlink` plugin
+  with `--strip-debug` and `--compress zip-6`, at 64 MB. Two routes were
+  measured against it and both worked; the plugin won on least build code.
+  The image still needs the host's GTK3 and X11 libraries. Chosen from the
+  `prototype-tray-packaging` evidence.
+- The tray is an AWT-backed JavaFX tray, `FXTrayIcon`, guarded by
+  `SystemTray.isSupported()` so a missing tray degrades to the window instead
+  of ending the application. Every JavaFX tray library wraps AWT, and
+  `javafx.graphics` already requires `java.desktop`, so a no-tray image saves
+  nothing. A real desktop test is an acceptance item for the tray child
+  effort. Decided by `prototype-tray-packaging`.
+- One JVM can host Spring Boot and JavaFX, with Spring owning `main`, starting
+  the context, then `Platform.startup`, and an explicit shutdown order:
+  `Platform.exit()` on the FX thread, a latch, then `context.close()` on the
+  main thread. Measured at 7 ms to quit. The context does not close on
+  `Platform.exit()` by itself. Decided by `prototype-javafx-spring-jvm`.
+- Classpath JavaFX warns and then works when the main class does not extend
+  `Application`, and a Spring Boot fat jar makes that the default
+  configuration. The module-path rule is therefore enforced by the build, not
+  by the runtime. Decided by `prototype-javafx-spring-jvm`.
+- Ordering is deadline first, dependency pressure second, and priority only as
+  a tie-break, and a prerequisite inherits the earliest effective deadline of
+  the tasks it unblocks. Without the inheritance every rule misses a deadline
+  in one adapted worked example by 30 minutes. Decided by
+  `prototype-ordering-engine`.
+- The MCP server runs only in a dedicated `mcp serve` subcommand that owns
+  standard input and output, and nothing may write to standard output in that
+  mode. A logging backend defaulting to standard output broke the protocol in
+  the prototype. Decided by `prototype-cli-mcp-stdio`.
 
 ## Fog
 
