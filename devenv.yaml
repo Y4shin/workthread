@@ -1,4 +1,4 @@
-watch: false
+reload: false
 inputs:
   nixpkgs:
     url: github:cachix/devenv-nixpkgs/rolling
