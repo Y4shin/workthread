@@ -25,8 +25,14 @@ architecture.
   question faster than prose. Nothing mergeable is produced.
 - Java 21 or newer. The build tool, Java version, and test stack are settled
   here through the stack research task.
-- The pre-v1 build order is the command line interface, then the backend
-  logic, then MCP, then the daemon, then the desktop client, then the tray.
+- The pre-v1 build order is the command line interface, then MCP, then the
+  daemon, then the desktop client, then the tray. The backend grows to its
+  final v1 stage inside the CLI stage, which spans several versions. Settled by
+  `version-order`.
+- The CLI stage may span several child efforts, so an effort is scoped to a
+  capability group rather than to "the CLI".
+- Versions are additive: a version keeps every interface an earlier version
+  shipped, and each version is tagged before the next one opens.
 - Every user-facing or external-facing interface works with the backend in the
   same process or by talking to the daemon.
 - Child efforts are separate efforts linked by `origin_effort` on the child's
@@ -76,6 +82,12 @@ decision a child would otherwise have to settle is recorded in
   authority (RULE-ARCH-1 to RULE-ARCH-6).
 - The command line interface is a first-class v1 surface, shipped beside the
   desktop client and the tray, and it hosts MCP over stdio.
+- The pre-v1 sequence is the CLI stage, then MCP, then the daemon, then the
+  desktop client, then the tray, and the backend grows to its final v1 stage
+  inside the CLI stage. Settled by `version-order`.
+- Every version ends with a version number, works on real tasks, and keeps
+  every interface an earlier version shipped. No version removes a working
+  command or surface. Settled by `version-order`.
 - Capacity comes from a timetable of hours per weekday plus time off recorded
   ahead or retroactively. Today's capacity is the session: from now until the
   planned leave time, minus the planned break minutes.
@@ -136,12 +148,13 @@ decision a child would otherwise have to settle is recorded in
   Decided by `spec-additions`.
 - Deadline pressure stays at its simplest: ordering still protects deadlines,
   with a forecast horizon of two weeks at most. Decided by `spec-additions`.
-- The pre-v1 build order is the CLI, then the backend logic, then MCP, then the
-  daemon, then the desktop client, then the tray. A general architecture
-  grilling runs after the order is settled, and the two existing service and
-  agent grillings run after the architecture. A separate release plan runs
-  after the architecture and the child-effort list. Decided by
-  `spec-additions`.
+- The pre-v1 order is the CLI stage, then MCP, then the daemon, then the
+  desktop client, then the tray, with the backend grown to its final v1 stage
+  inside the CLI stage. A general architecture grilling runs after the order
+  is settled, and the two existing service and agent grillings run after the
+  architecture. A separate release plan runs after the architecture and the
+  child-effort list. Decided by `spec-additions` and amended by
+  `version-order`.
 - The command line interface is a first-class v1 surface that hosts MCP over
   stdio, and every interface works with the backend in process or through the
   daemon. Decided by `spec-additions`.
@@ -186,6 +199,21 @@ decision a child would otherwise have to settle is recorded in
   standard input and output, and nothing may write to standard output in that
   mode. A logging backend defaulting to standard output broke the protocol in
   the prototype. Decided by `prototype-cli-mcp-stdio`.
+- The first two stages of the earlier order collapse into one CLI stage made of
+  several versions. It runs until the core product is usable from the CLI, and
+  the MCP stage opens only after that. The first version carries capture,
+  list and inspect, the timer, logged time, and complete, with a fixed sort of
+  deadline then priority. Decided by `version-order`.
+- The CLI stage's versions follow capability areas: capture, list, timer and
+  complete; then projects, dependencies, estimates, priority and deadlines;
+  then timetable, session and the ordered today list; then forecasts, warnings
+  and overrides; then review, export and settings. The grouping is an ordering
+  constraint, and `release-plan` names the releases and places the child
+  efforts. Decided by `version-order`.
+- The Spring Boot API module arrives with the daemon stage and not earlier, so
+  the core stays framework-free and the build can enforce it. v1 is the
+  release after the tray stage, and it meets the completion signals in
+  specification section 8.8. Decided by `version-order`.
 
 ## Fog
 
