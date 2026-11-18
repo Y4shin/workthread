@@ -56,6 +56,12 @@ architecture.
   specification sections 1.4 and 2.2.
 - No release, packaging, installer, or distribution work.
 - No bug triage of implemented code: none exists yet.
+- No split working days: a weekday carries one window, so a future day cannot
+  hold a morning block and an evening block. Decided by
+  `session-and-timetable`.
+- No task time as the month's accounting quantity: presence is what the account
+  measures, which keeps untracked work from becoming debt. Decided by
+  `session-and-timetable`.
 
 ## Non-negotiable facts
 
@@ -253,6 +259,68 @@ decision a child would otherwise have to settle is recorded in
   as a jar with a manifest and a configuration section of their own, a network
   daemon at the bind address, and a fifth surface as a new module. None of it
   is built in v1. Decided by `architecture`.
+- The task record is reconciled against Taskwarrior's field by field: the
+  identifier is a monotonic integer that is opaque by rule and displayed as
+  `TSK-0001` or `PRJ-0001`, the title stays required, and §3.2's optional
+  description is replaced by timestamped, append-only notes. Tags,
+  user-defined attributes, urgency, the `wait`, `scheduled`, and `until`
+  dates, and recurrence are refused, each with its reason. Decided by
+  `task-model-comparison`.
+- The identifier's guarantee rests on three written constraints:
+  `AUTOINCREMENT` so a value is never reused, the data owner as the only
+  allocator, and nothing ever renumbering, with a test that a deleted id is
+  never reused. Decided by `task-model-comparison`.
+- History lives in the operation log and not in the task record, and
+  requirements are rules in the core rather than constraints in the store,
+  with identity, status, and the timestamps the one exception. Decided by
+  `task-model-comparison`.
+- Date gating, as a single "not before" date, and recurrence are the two named
+  changes immediately after v1, in that order. Every other refusal from this
+  comparison returns without a schedule. Decided by `task-model-comparison`.
+- A weekday carries only its net work minutes, one window, with no clock
+  intervals and no pause budget. One configured planned start supplies the
+  clock for future days and is replaced by the observed start once the day
+  begins, so arriving later means leaving later. Decided by
+  `session-and-timetable`.
+- A session is the record for one date: its start, its leave time, and its
+  break reserve. The leave is derived from the day's minutes and can be moved
+  at any moment, which is how "stay later today" and "I must leave earlier"
+  are said. The session takes the place of §5.17's capacity override, so two
+  rules stay overridable. An unended day gets an inferred end and a persistent
+  notice. Decided by `session-and-timetable`.
+- Time off is one record per date with a minute count and a kind: `vacation`
+  reduces the month's target as well as the day's capacity, `flex` changes only
+  the day's capacity in either direction so the difference is compensated
+  elsewhere, and zero means a day away. Decided by `session-and-timetable`.
+- The month is the account. The target is the month's weekday minutes minus
+  vacation, and worked is session presence minus the reserve, deliberately not
+  task time, because untracked presence is not a deficit. The balance runs
+  inside the month under four settings in two bands: a permitted shortfall and
+  surplus that clamp the month's close, and a target shortfall and surplus that
+  the plan reconciles to, all defaulting to zero. Decided by
+  `session-and-timetable`.
+- Reconciliation settles the balance in thirty-minute increments over the days
+  after today that have work, in date order, cycling while unsettled, never
+  below zero, and never touching a day that carries its own minutes. That last
+  is an invariant binding every future projection algorithm, and the algorithm
+  is a configuration point with one implementation in v1. Decided by
+  `session-and-timetable`.
+- Concrete allocation covers fourteen days. Projections continue past it,
+  marked as approximations and rough beyond four weeks, with
+  `horizon_over_capacity` as the signal that the tool is being used beyond its
+  design. The today list is bounded by the day's capacity, is not re-planned as
+  time passes, and shows a cut line where the plan passes the leave time.
+  Decided by `session-and-timetable`.
+- One `notice` concept carries everything the system says: a persistence flag,
+  a level of `info` or `warning`, and an OS delivery flag, with the list and
+  the dismissal on `ForPlanningQueries`. There are nine notice types and the
+  specification's `critical` severity retires. The review compares the month
+  day by day on presence, not on task time. Decided by
+  `session-and-timetable`.
+- A deadline is a date or an instant, a sealed pair: a date means before that
+  local day ends, an instant is accepted only for the current local day, and
+  every effective-deadline comparison reads a date as the end of its day.
+  Decided by `session-and-timetable`.
 
 ## Fog
 
