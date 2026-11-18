@@ -142,7 +142,8 @@ _Avoid_: catch-up, compensation, balancing
 **Notice**:
 Something the system reports. A persistent notice lasts while its condition
 holds, a one-off notice until it is dismissed, and each notice carries a level
-of info or warning.
+of info or warning. Dismissing a persistent notice hides it until its condition
+clears, and the dismissal is not remembered.
 _Avoid_: warning (that is the level), notification (that is delivery to the
 operating system), alert, message
 
@@ -167,3 +168,25 @@ _Avoid_: finish item, zero slot
 More than one task in progress at the same time. It requires both the
 configuration setting and an explicit request on each start.
 _Avoid_: multi-tasking, parallel work
+
+### Forecasts
+
+**Forecast**:
+The answer to whether a task or project can finish by its effective deadline,
+with a projected finish, the slack, a risk value, and an explanation. A
+supporting view, never the plan itself.
+_Avoid_: prediction, estimate (that is effort), schedule
+
+**Slack**:
+The capacity minutes between now and an effective deadline, minus the
+unallocated effort of the whole dependency closure. Negative slack means the
+work cannot fit, whatever else is true.
+_Avoid_: buffer, headroom
+
+**Risk**:
+One of `blocked`, `missed`, `unscheduled`, `tight`, and `safe`, decided in that
+order of precedence. `blocked` is a dependency-path problem, `missed` is
+negative slack or a passed deadline with work left, `unscheduled` is work that
+cannot be placed for another reason, and the other two compare slack against
+fifteen percent of the closure's effort.
+_Avoid_: status (that is the task), health, severity

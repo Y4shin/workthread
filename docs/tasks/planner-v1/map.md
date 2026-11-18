@@ -343,6 +343,25 @@ decision a child would otherwise have to settle is recorded in
   fail with an error naming that, and the client offers to start the session in
   place. Ending the day stops every open timer at its stop time. Decided by
   `decisions-estimates-time`.
+- A deliverable is missed when its slack is negative or its deadline has passed
+  with work remaining, whether or not a finish could be placed. Unscheduled
+  covers only remaining work that cannot be placed for a reason other than
+  deadline capacity, and blocked stays tied to the dependency graph, so a
+  task's own ineligibility is unscheduled. Decided by
+  `decisions-forecast-warnings`.
+- Itinerary reasons are six values: the specification's four plus
+  `earlier_deadline` and `stable_order`. Decided by
+  `decisions-forecast-warnings`.
+- A tenth notice type, `deadline_approaching`, is raised while an effective
+  deadline falls within a configurable lead window that defaults to
+  twenty-four hours and work remains. Levels and OS delivery are settings with
+  defaults rather than constants, persistence is not, and a persistent notice
+  may be dismissed and returns if its condition recurs. Decided by
+  `decisions-forecast-warnings`.
+- Slack is measured against the day capacities, which include the monthly
+  reconciliation and exclude vacation and zero-length flex days, and against
+  projections past the horizon, labelled rough beyond four weeks. Decided by
+  `decisions-forecast-warnings`.
 
 ## Fog
 
