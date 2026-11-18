@@ -214,6 +214,45 @@ decision a child would otherwise have to settle is recorded in
   the core stays framework-free and the build can enforce it. v1 is the
   release after the tray stage, and it meets the completion signals in
   specification section 8.8. Decided by `version-order`.
+- The core is hexagonal, with two port families: surface ports, which the core
+  implements and a surface calls, and infrastructure ports, which the core
+  calls and an adapter implements. Both use the `For...` name and the side is
+  carried by the package, `port.surface` and `port.infrastructure`, never by
+  the identifier. A surface is any driving adapter, the daemon's API listener
+  included. Decided by `architecture`.
+- Seven surface ports carry the use cases by area: `ForCapturingTasks`,
+  `ForManagingProjects`, `ForPlanningQueries`, `ForTrackingTime`,
+  `ForOverridingRules`, `ForDefiningCapacity`, and `ForConfiguring`. The
+  override port carries the confirmation channel, and capacity is separate
+  from configuration because changing capacity recomputes the plan. A
+  surface's own preferences are its own file and never a port. Decided by
+  `architecture`.
+- The core's infrastructure ports are `ForPlanning`, `ForStoringWork`,
+  `ForReadingClock`, and `ForNotifying`, with `ForStoringAttachments` and
+  `ForRememberingSurfacePreferences` reserved. One port call is one
+  transaction, the change log is written inside it, and `snapshotFor(asOf)`
+  gives the planner one consistent input. The planner takes data, never a
+  store. Decided by `architecture`.
+- One configurator carries the in-process-or-daemon rule, from an explicit
+  startup configuration with three shapes: standalone, daemon, and split
+  surface. `serveMcp` is the only optional surface in a process. Only one
+  process may own the data, and a second one fails with a clear message, so
+  sharing a backend across processes requires the daemon. Decided by
+  `architecture`.
+- The build is eight modules: `contract`, `core`, `adapters`, `wiring`, `api`,
+  `mcp`, `cli`, and `client`, with the core seeing only `contract`.
+  Persistence is SQLite in WAL, with an ownership lock in the platform runtime
+  directory, ordered SQL migrations checked against a version and checksums,
+  and `VACUUM INTO` for an export. A loopback bind needs no token, a
+  non-loopback bind needs a token and a fixed port, and no credential is
+  written to a shared file. Decided by `architecture`.
+- The two run modes are defined by where the work logic runs. The full design
+  record is `docs/tasks/planner-v1/architecture.md`, written by to-tickets from
+  this task. Post-v1 work attaches at named points: a replacement planner or
+  store through its port, attachments through a reserved port, tracker plugins
+  as a jar with a manifest and a configuration section of their own, a network
+  daemon at the bind address, and a fifth surface as a new module. None of it
+  is built in v1. Decided by `architecture`.
 
 ## Fog
 
