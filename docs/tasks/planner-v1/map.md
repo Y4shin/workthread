@@ -321,6 +321,28 @@ decision a child would otherwise have to settle is recorded in
   local day ends, an instant is accepted only for the current local day, and
   every effective-deadline comparison reads a date as the end of its day.
   Decided by `session-and-timetable`.
+- The estimate is total effort in one stored field, with remaining effort
+  derived as the total minus logged minutes and allowed to go negative. The
+  editing surfaces offer two doors into that one field: set the total, or set
+  the remaining, which writes the logged time plus the new remaining. A ready
+  task keeps a positive estimate, so clearing it is refused rather than
+  silently moving the task to the inbox. Decided by `decisions-estimates-time`.
+- A task never claims negative effort. An unfinished task at or below zero
+  remaining effort receives a five-minute completion slot, but while a timer
+  runs the running block is the claim instead, so an overrun keeps growing and
+  pushes the rest of the day later until it is stopped. Any overrun raises a
+  persistent `estimate_overrun` notice, the application never rewrites the
+  estimate, and completion stays explicit. Decided by
+  `decisions-estimates-time`.
+- Pausing keeps the task in progress and starting another returns it to ready.
+  Concurrent tasks are allowed behind a configuration setting that ships off,
+  and with it on a second concurrent start still requires explicit intent from
+  the caller. The single active task becomes a set. Decided by
+  `decisions-estimates-time`.
+- A task timer cannot start unless the day has been started: the interfaces
+  fail with an error naming that, and the client offers to start the session in
+  place. Ending the day stops every open timer at its stop time. Decided by
+  `decisions-estimates-time`.
 
 ## Fog
 

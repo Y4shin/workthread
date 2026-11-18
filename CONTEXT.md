@@ -145,3 +145,25 @@ holds, a one-off notice until it is dismissed, and each notice carries a level
 of info or warning.
 _Avoid_: warning (that is the level), notification (that is delivery to the
 operating system), alert, message
+
+### Effort
+
+**Estimate**:
+A task's total planned effort in minutes, the only stored effort value.
+_Avoid_: remaining estimate, budget, effort
+
+**Remaining effort**:
+The estimate minus the task's logged minutes. It is derived, it is never
+clamped, and it can be negative, which means the task is running long.
+_Avoid_: time left (in the stored sense), unspent estimate
+
+**Completion slot**:
+The five minutes the plan holds for an unfinished task whose remaining effort
+has reached zero, as a placeholder for the act of completing it. It is planned
+only while the task is not running.
+_Avoid_: finish item, zero slot
+
+**Concurrent work**:
+More than one task in progress at the same time. It requires both the
+configuration setting and an explicit request on each start.
+_Avoid_: multi-tasking, parallel work
