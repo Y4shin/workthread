@@ -62,6 +62,12 @@ architecture.
 - No task time as the month's accounting quantity: presence is what the account
   measures, which keeps untracked work from becoming debt. Decided by
   `session-and-timetable`.
+- No WebSockets in v1, and no second description format: the live channel is
+  server-sent events inside the one OpenAPI document. Decided by
+  `live-api-choice`.
+- No pushed projections: the stream carries the current cursor and notice
+  events only, and every list, forecast, and review is read over REST. Decided
+  by `live-api-choice`.
 
 ## Non-negotiable facts
 
@@ -405,6 +411,44 @@ decision a child would otherwise have to settle is recorded in
   with its version row, the application refuses a database newer than it knows,
   and a pre-migration copy is kept beside the database. Decided by
   `decisions-data-lifecycle`.
+- The run mode is detected rather than chosen: `workthread` attaches to a
+  running daemon and otherwise runs the work logic in its own process, and the
+  daemon is a subcommand meant to be started by a service manager. A daemon
+  lost mid-run fails the call and offers an explicit takeover, never a silent
+  mode switch. Decided by `decisions-service-mode`.
+- A graceful stop records its instant and leaves timers and the session open,
+  and the next start presents anything opened before that instant for
+  correction, defaulting the end to the recorded stop; a crash takes the same
+  route. Decided by `decisions-service-mode`.
+- Configuration has an owner and no file is shared: the daemon's process
+  settings live in a file or the environment, a surface's own settings in its
+  own configuration, and every business setting in the daemon's data, reachable
+  only through its API. Decided by `decisions-service-mode`.
+- The API is a versioned, OpenAPI-documented REST contract organised by record
+  kind, used by the application's own surfaces in split mode and by any
+  external consumer, with every operation expressed as a resource or an action
+  on one and no RPC-shaped endpoints. Whether it carries a live push channel,
+  and whether that is server-sent events or WebSockets, is decided by
+  `live-api-research` and `live-api-choice` before the child effort list is
+  produced. Decided by `decisions-service-mode`.
+- The live channel's evidence is captured by `live-api-research` at
+  `docs/research/live-api.md`: server-sent events need one controller method
+  and carry `Last-Event-ID` for resumption, OpenAPI 3.2 describes an event
+  stream per event while AsyncAPI's first-party generators are archived, and
+  the JDK ships a WebSocket client but no event-stream client. `live-api-choice`
+  decides from that evidence. Decided by `live-api-research`.
+- v1 ships server-sent events on the same HTTP API, port, document, and token
+  rule, resuming through the `Last-Event-ID` header carrying the change cursor.
+  WebSockets are refused for v1 with the evidence recorded. Decided by
+  `live-api-choice`.
+- The stream carries notifications only: a `state` event with the current
+  cursor when it opens, `changed` events as records change, and `notice` events
+  with type and level. Every list, forecast, and review is still read over
+  REST, so reconnect needs no replay buffer. Decided by `live-api-choice`.
+- One event-stream reader lives in the module holding the remote proxy and
+  serves the desktop, tray, and command line clients, with polling kept as a
+  fallback. The stream sends a fifteen-second heartbeat and the server recycles
+  a connection after thirty minutes. Decided by `live-api-choice`.
 
 ## Fog
 

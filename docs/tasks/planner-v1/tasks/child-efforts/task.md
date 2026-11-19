@@ -84,3 +84,24 @@ the task's preconditions:
 The list must also reflect the human's build order: a CLI stage first, then
 backend logic, MCP, the daemon, the desktop client, and the tray. A child
 effort that cuts across stages is a signal to split it.
+
+### Ordering note added after the service-mode grilling
+
+This task's `blocked_by` list cannot gain new blockers after creation, so record
+the ordering here: do not produce the final effort list before `live-api-choice`
+is done.
+
+Reasons:
+
+- The API child effort's scope depends on whether the API carries a live push
+  channel, which is decided by `live-api-choice` from the evidence in
+  `live-api-research`. A push channel adds a transport, a stream state, and a
+  description format, and may add an effort of its own.
+- The API is now a published contract, documented with OpenAPI and usable
+  outside the application, so the child that owns it owns a contract rather than
+  an internal seam. That is a different scope from the one this task's body
+  assumes.
+- The daemon and surface configuration split decided by `decisions-service-mode`
+  also lands in that child: the daemon's process configuration, the surface's
+  own configuration, and the business settings that live in the daemon's data
+  and are reachable only through the API.

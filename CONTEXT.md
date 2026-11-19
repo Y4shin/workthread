@@ -206,6 +206,17 @@ runs when the code is confirmed and dies after three failed attempts or when it
 expires.
 _Avoid_: pending request, approval queue item, draft
 
+**Change feed**:
+The ordered record of stored changes that a caller reads forward from a cursor.
+It carries changes to stored records, never projections.
+_Avoid_: log (that is the operation log), event bus, audit trail
+
+**Event stream**:
+The server-sent stream that reports the current cursor when it opens, stored
+changes as they happen, and notices as they are raised. It carries no
+projections, and a consumer that needs state reads it over REST.
+_Avoid_: live feed, push API, websocket stream
+
 ### Data
 
 **Export**:
