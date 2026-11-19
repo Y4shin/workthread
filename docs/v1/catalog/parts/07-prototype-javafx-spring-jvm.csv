@@ -1,0 +1,11 @@
+id,order,source_file,line,section,title,status,target,effort,spec,note
+T07-001,7,docs/tasks/planner-v1/tasks/prototype-javafx-spring-jvm/task.md,56,Notes > Findings,"Yes: one JVM can host Spring Boot and JavaFX, with an explicit shutdown order",,,,,
+T07-002,7,docs/tasks/planner-v1/tasks/prototype-javafx-spring-jvm/task.md,61,Notes > Findings,"Spring Boot owns main, starts the context, then Platform.startup: recommended when Spring is in the process",,,,,
+T07-003,7,docs/tasks/planner-v1/tasks/prototype-javafx-spring-jvm/task.md,67,Notes > Findings,"The only hard failure is the java launcher's main-class check, which fires only when the main class extends javafx.application.Application",,,,,
+T07-004,7,docs/tasks/planner-v1/tasks/prototype-javafx-spring-jvm/task.md,73,Notes > Findings,Packaging a runnable jar makes the documented-unsupported configuration the default configuration,,,,,
+T07-005,7,docs/tasks/planner-v1/tasks/prototype-javafx-spring-jvm/task.md,78,Notes > Findings,The Spring context does not close on Platform.exit(),,,,,
+T07-006,7,docs/tasks/planner-v1/tasks/prototype-javafx-spring-jvm/task.md,79,Notes > Findings,"Without an explicit close it is closed by Spring Boot's shutdown hook, and the hook ordering varied between runs",,,,,
+T07-007,7,docs/tasks/planner-v1/tasks/prototype-javafx-spring-jvm/task.md,80,Notes > Findings,"The shape that behaves is Variant A with an explicit order: Platform.exit() on the FX thread, then a latch, then context.close() on the main thread",,,,,
+T07-008,7,docs/tasks/planner-v1/tasks/prototype-javafx-spring-jvm/task.md,85,Notes > Findings,"--add-modules javafx.controls, or the app dies with NoClassDefFoundError: javafx/scene/Parent",,,,,
+T07-009,7,docs/tasks/planner-v1/tasks/prototype-javafx-spring-jvm/task.md,86,Notes > Findings,"-linux classified JavaFX jars, because the unclassified stubs fail with FindException: Module javafx.controls not found",,,,,
+T07-010,7,docs/tasks/planner-v1/tasks/prototype-javafx-spring-jvm/task.md,96,Notes > Findings,"The build must enforce the module path, because the runtime does not. This is a scaffolding and packaging requirement, not advice",,,,,
