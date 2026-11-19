@@ -141,9 +141,9 @@ _Avoid_: catch-up, compensation, balancing
 
 **Notice**:
 Something the system reports. A persistent notice lasts while its condition
-holds, a one-off notice until it is dismissed, and each notice carries a level
-of info or warning. Dismissing a persistent notice hides it until its condition
-clears, and the dismissal is not remembered.
+holds, an ephemeral notice until it is dismissed, and each notice carries a
+level of info or warning. Dismissing a persistent notice hides it until its
+condition clears, and the dismissal is not remembered.
 _Avoid_: warning (that is the level), notification (that is delivery to the
 operating system), alert, message
 
@@ -190,3 +190,38 @@ negative slack or a passed deadline with work left, `unscheduled` is work that
 cannot be placed for another reason, and the other two compare slack against
 fifteen percent of the closure's effort.
 _Avoid_: status (that is the task), health, severity
+
+### Agent interface
+
+**Cursor**:
+An opaque position in the change log that a caller passes back to receive what
+changed since. Callers must not interpret it, compare it, or do arithmetic on
+it.
+_Avoid_: timestamp, offset, sequence number, watermark
+
+**Pending operation**:
+A recorded intent waiting for a human's approval, holding the intent's own
+parameters, a two-digit confirmation code, an expiry, and an attempt count. It
+runs when the code is confirmed and dies after three failed attempts or when it
+expires.
+_Avoid_: pending request, approval queue item, draft
+
+### Data
+
+**Export**:
+The portable representation of the planning data: a zip holding one documented
+JSON document plus an attachments directory. It is readable without the
+application and is not the same thing as a backup.
+_Avoid_: dump, snapshot, backup, archive
+
+**Backup**:
+A copy of the database file, taken with `VACUUM INTO` or by copying the data
+directory while no service owner runs. It restores the application; it is not
+portable outside it.
+_Avoid_: export, snapshot
+
+**Purge**:
+The permanent deletion of cancelled and archived records older than the
+configured age. It runs only when that age is set, it is never invoked
+on request, and purging a project takes its tasks with it.
+_Avoid_: cleanup, vacuum, delete

@@ -362,6 +362,49 @@ decision a child would otherwise have to settle is recorded in
   reconciliation and exclude vacation and zero-length flex days, and against
   projections past the horizon, labelled rough beyond four weeks. Decided by
   `decisions-forecast-warnings`.
+- A dependency change that would close a loop is refused and leaves an
+  ephemeral notice naming the tasks in the loop; it is not a persisting
+  condition. The two notice lifetimes are persistent and ephemeral. Decided by
+  `decisions-agent-interface`.
+- The agent surface is a flat set of one tool per operation, named snake case
+  and prefixed by its noun, each with a strict schema. Identifiers are accepted
+  as the bare integer or as the prefixed display form, with no fuzzy matching,
+  and every failure returns a stable code, a message, and the offending entity
+  or field. Decided by `decisions-agent-interface`.
+- Confirmation is a two-step handshake: the call records a pending operation
+  holding its own intent and returns its id with a requirement, a two-digit
+  code reaches the human through the strongest available channel, and the agent
+  confirms with the id and the code, with three attempts and a five-minute
+  expiry. Decided by `decisions-agent-interface`.
+- Every read of changing state returns the whole current state plus the changes
+  since an optional opaque cursor, grouped per entity with a header against
+  reconstructing state, and one general change feed does the same without an
+  entity. Every change records the surface it came from and whether a human or
+  an agent drove it. Decided by `decisions-agent-interface`.
+- Nothing is deleted on request: a task is cancelled and a project archived.
+  A configurable purge age, off by default, permanently deletes cancelled and
+  archived records older than that and says that purging a project takes its
+  tasks with it. Cancelling and archiving record the moment they happened, and
+  the purge reads it. Decided by `decisions-data-lifecycle`.
+- Removal asks for confirmation when it changes something already reported, so
+  a past per-date entry, a closed time entry, or a note, and never for
+  plan-only removals. Decided by `decisions-data-lifecycle`.
+- The review recomputes each past day's target and presence from current
+  configuration, stores no past itinerary, and says plainly that it measures
+  the days against the hours expected now. Reconstructing the timetable from
+  the operation log is the named upgrade. Decided by
+  `decisions-data-lifecycle`.
+- The export is a zip holding one documented JSON document with a format
+  version, engine-independent and carrying identifiers and the sequence state,
+  plus an attachments directory when attachments arrive. A backup is the
+  database file itself, and the export excludes the operation log. Decided by
+  `decisions-data-lifecycle`.
+- Dismissed ephemeral notices, finished or expired pending operations, and the
+  dismissal record of a resolved persistent notice are deleted at once; the
+  operation log is kept forever in v1. Each migration runs in one transaction
+  with its version row, the application refuses a database newer than it knows,
+  and a pre-migration copy is kept beside the database. Decided by
+  `decisions-data-lifecycle`.
 
 ## Fog
 
