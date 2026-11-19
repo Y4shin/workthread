@@ -38,11 +38,35 @@ architecture.
 - Child efforts are separate efforts linked by `origin_effort` on the child's
   map. They are never tickets and never `blocked_by` edges.
 - Close route: to-spec, then to-tickets for the architecture document and one
-  formality ticket, then finalize on branch `effort/planner-v1`.
+  formality ticket, then finalize on branch `effort/planner-v1`. `to-spec`
+  writes the specification by walking `docs/v1/requirements-directory.csv`,
+  runs the coverage check and the adversarial read, and does not publish until
+  both pass, per `spec-traceability`.
 - Writes under `docs/tasks/` go through the `tw_*` tools only.
 - Dependency edges are fixed at task creation, so a late ordering constraint is
   recorded in the affected task's notes. The affected tasks are
-  `child-efforts`, `decisions-service-mode`, and `decisions-agent-interface`.
+  `child-efforts`, `decisions-service-mode`, `decisions-agent-interface`,
+  `ui-framework-prototype`, and `requirements-directory`.
+- The desktop client's toolkit is settled by `ui-framework-decision`: JavaFX
+  ships, the client stays a Java module, and the work logic stays in Java. The
+  JavaFX-dependent decisions on this map are therefore confirmed and not
+  provisional. Accepted risks: Java 21 caps the usable JavaFX line at 23.0.2,
+  and the Linux system tray is the weakest part of the choice, which the tray
+  child effort tests on a real desktop.
+- The command line interface follows the convention settled by
+  `cli-surface-convention`, which the architecture document carries in full.
+  Commands are noun first, `workthread <area> <action>`, over seven areas that
+  map one to one onto the surface ports, plus `mcp serve` and `confirm`. One
+  command is one port operation. Output is text, with one global
+  `--format json` printing one document per invocation; errors go to standard
+  error with the stable failure code. Exit codes are `0` success, `1` reserved
+  for an unknown or uncategorised error, `2` usage, `3` validation refused, `4`
+  rule refused including an unavailable confirmation, `5` service unreachable.
+  Only a confirmed removal or an override may prompt, and only on a terminal;
+  without one the command returns a pending operation and exits `4`, completed
+  by `workthread confirm <id> <code>`. Shell completion is v2. Every later CLI
+  child names its commands inside these areas, and the additive-version rule
+  covers commands, flags, JSON shapes, and exit codes alike.
 
 ## Non-goals
 
@@ -449,7 +473,388 @@ decision a child would otherwise have to settle is recorded in
   serves the desktop, tray, and command line clients, with polling kept as a
   fallback. The stream sends a fifteen-second heartbeat and the server recycles
   a connection after thirty minutes. Decided by `live-api-choice`.
+- The desktop client's toolkit is put to the evidence by
+  `ui-framework-research`, at `docs/research/ui-framework.md`: Compose
+  Multiplatform, JavaFX, SWT with JFace, Swing, and a local web interface were
+  compared against the rule that the work logic stays in Java. Nothing beats
+  JavaFX on that rule, so the recommendation is JavaFX 21 LTS, because Java 21
+  caps the usable JavaFX line at 23.0.2. Compose Multiplatform is the runner-up.
+  Its seam is one Kotlin facade that Java calls, and Kotlin calls Java for free,
+  but `@Composable` code cannot be compiled by `javac`, so the whole client
+  layer would be Kotlin, and its Linux screen-reader support is documented as
+  absent. Decided by `ui-framework-research`.
+- JavaFX ships the desktop client, on the 21 LTS line. The human settled it and
+  declined the prototype, because JavaFX works natively inside the Java
+  process. The client stays a Java module with no second language, no compiler
+  plugin, and no interop seam, so the JavaFX-dependent decisions on this map are
+  confirmed rather than provisional: the `client` module's toolkit, the `jlink`
+  image rule, the one-JVM shutdown order, and the AWT-backed tray. Accepted
+  risks, not open questions: Java 21 caps the usable JavaFX line at 23.0.2, and
+  the Linux tray is the weakest part of the choice. Decided by
+  `ui-framework-decision`.
 
 ## Fog
 
+## Child efforts
 
+Settled by `child-efforts` in one grilling, after the UI framework was decided.
+Twelve efforts, listed by stage in the five sections below this one: CLI stage,
+MCP stage, Daemon stage, Desktop stage, and Tray stage. That grouping follows
+the settled pre-v1 sequence, and each stage section holds its numbered efforts
+in order.
+
+These are live efforts, created at this effort's close, each with
+`origin_effort: planner-v1` on its own map. Releases are not assigned here:
+`release-plan` names them. Each child is scoped to a capability group, never to
+a surface, and a child that would cut across stages is a signal to split it. The
+command line interface's own vocabulary, output format, and exit codes are
+settled by `cli-surface-convention` before the first CLI child starts.
+
+## CLI stage
+
+### 1. scaffolding
+
+- **Scope.** Build files, the eight module skeletons, CI, the test harness, the
+  `jlink` image build, and the version-tagging and additivity rule. It also
+  ships one empty JavaFX window packaged as a `jlink` image, because the
+  module-path rule is enforced by the build and is cheapest to break on the
+  first commit.
+- **Does not cover.** Any product behaviour, any record, any use case.
+- **Depends on.** Nothing. It is the first child.
+- **Entry criteria.** None. The stack is settled by `stack-research` and the
+  prototypes, and the JavaFX choice is settled by `ui-framework-decision`.
+- **Hands forward.** A repository where `./gradlew build` passes, the build
+  refuses JavaFX on the classpath, and an empty window ships as an image.
+- **Relies on.** The eight-module graph, the Gradle and JUnit stack, and the
+  `jlink` packaging rule from `architecture`.
+
+### 2. work-store
+
+- **Scope.** The task and project record model, including notes, statuses, and
+  identifiers; the SQLite store behind `ForStoringWork`; ordered migrations with
+  a version and checksums; the operation log; the change log with cursors; the
+  ownership lock; the data location; and `snapshotFor`.
+- **Does not cover.** The planner, any surface, export, or purge.
+- **Depends on.** `scaffolding`.
+- **Entry criteria.** The build passes and `contract` exists.
+- **Hands forward.** A store that round-trips a task and a project, answers
+  "what changed since this cursor", and refuses a second owner.
+- **Relies on.** The task model from `task-model-comparison`, the persistence
+  decisions from `architecture`, and the change feed shape from
+  `decisions-agent-interface`.
+
+### 3. cli-basics
+
+- **Scope.** The `cli` module and its argument parsing; the standalone
+  configurator and runtime from `wiring`; capture, list, inspect, and complete;
+  the timer and logged time; and the minimal day start the timer requires, with
+  the day length read from one configured default.
+- **Does not cover.** Projects, dependencies, estimates, priority, deadlines,
+  the timetable, the today list, and anything after them.
+- **Depends on.** `work-store`.
+- **Entry criteria.** The store round-trips records, and
+  `cli-surface-convention` has settled the command vocabulary and output
+  format.
+- **Hands forward.** A working command line application where a task is
+  captured, found, worked, and completed, and where time is corrected.
+- **Relies on.** `decisions-estimates-time` for the day-start rule and the
+  timer states, and `architecture` for the single configurator.
+
+### 4. cli-work-model
+
+- **Scope.** Projects, dependencies with derived blocking and cycle refusal
+  including the path, estimates as total effort with derived remaining, semantic
+  priority, deadlines as the sealed date-or-instant pair, and cancel and
+  archive.
+- **Does not cover.** Ordering, capacity, forecasts, and any projection.
+- **Depends on.** `cli-basics`.
+- **Entry criteria.** `cli-basics` is tagged and its commands keep working.
+- **Hands forward.** A task set carrying every scheduling input the planner
+  needs.
+- **Relies on.** The task model decisions, `decisions-estimates-time`, the
+  deadline rule from `session-and-timetable`, and the cancel and archive rule
+  from `decisions-data-lifecycle`.
+
+### 5. cli-planning
+
+- **Scope.** The timetable of net minutes per weekday, the full session with
+  leave time and break reserve, the month's target and balance with the
+  reconciliation rule, and the ordered today list with per-item reasons and the
+  fit signal.
+- **Does not cover.** Forecasts, warnings, notices, overrides, and review.
+- **Depends on.** `cli-work-model`.
+- **Entry criteria.** Estimates, deadlines, and dependencies all exist.
+- **Hands forward.** The primary v1 output: an ordered day that the user never
+  sorts by hand, with the cut line at the leave time.
+- **Relies on.** `session-and-timetable` in full, `prototype-ordering-engine`,
+  and `ForPlanning` as an infrastructure port taking data and not a store.
+
+### 6. cli-forecast
+
+- **Scope.** Forecasts with effective deadline, projected finish, slack, and
+  risk; the ten notice types; operating-system delivery through `ForNotifying`;
+  and the confirmed override with its two-step handshake.
+- **Does not cover.** Review, export, and settings.
+- **Depends on.** `cli-planning`.
+- **Entry criteria.** The ordered list computes from one snapshot.
+- **Hands forward.** The supporting risk layer and the confirmation channel
+  that the agent surface reuses.
+- **Relies on.** `decisions-forecast-warnings`, `decisions-agent-interface`
+  for the confirmation handshake, and the notice concept from
+  `session-and-timetable`.
+
+### 7. cli-review
+
+- **Scope.** Review projections over past days and months, export as the
+  documented JSON archive with `VACUUM INTO` for a backup, the configurable
+  purge age, the local timezone, and settings.
+- **Does not cover.** Anything owned by an earlier capability area.
+- **Depends on.** `cli-forecast`.
+- **Entry criteria.** Notices and the override path exist.
+- **Hands forward.** A command line interface that meets the core product
+  scope, which is the gate for opening the MCP stage.
+- **Relies on.** `decisions-data-lifecycle` in full.
+
+## MCP stage
+
+### 8. mcp-agent-interface
+
+- **Scope.** The `mcp` module; one tool per operation in snake case, prefixed by
+  its noun, with strict schemas; identifiers accepted in both display forms;
+  stable failure codes carrying the offending entity; the two-step confirmation
+  handshake; the read of current state plus changes since a cursor; and
+  `mcp serve` owning standard input and output.
+- **Does not cover.** Any transport other than standard input, and any write to
+  standard output by any module.
+- **Depends on.** `cli-review`.
+- **Entry criteria.** Every use case is reachable from the command line, so the
+  tool set mirrors it rather than designing anew.
+- **Hands forward.** An agent surface over the same rules, with the change feed
+  the API will reuse.
+- **Relies on.** `decisions-agent-interface` in full, and
+  `prototype-cli-mcp-stdio` for the standard-stream rule.
+
+## Daemon stage
+
+### 9. daemon-api
+
+- **Scope.** The `api` module; the Spring Boot listener; the versioned OpenAPI
+  contract organised by record kind; the server-sent event stream with
+  `Last-Event-ID` resumption and its heartbeat; the remote proxy implementing
+  every surface port, with the single stream reader; the daemon and split shapes
+  in the configurator; the token rule; and graceful stop with takeover.
+- **Does not cover.** The desktop window and the tray.
+- **Depends on.** `mcp-agent-interface`.
+- **Entry criteria.** The change feed and its cursor exist and are tested.
+- **Hands forward.** A daemon any surface can attach to, and a client that can
+  run in either mode without knowing which.
+- **Relies on.** `decisions-service-mode`, `live-api-choice`, and the
+  one-owner rule from `architecture`.
+
+## Desktop stage
+
+### 10. client-shell
+
+- **Scope.** JavaFX and Spring in one JVM with the measured shutdown order;
+  navigation; and the Today view including the fit signal, the per-item reasons,
+  and the cut line.
+- **Does not cover.** The other four views and the tray.
+- **Depends on.** `daemon-api`.
+- **Entry criteria.** The remote proxy and the standalone configurator both
+  work, so the shell runs in either mode.
+- **Hands forward.** A window showing the primary output, driven by the same
+  ports as the command line.
+- **Relies on.** `prototype-javafx-spring-jvm` for the process and shutdown
+  order, and `ForPlanningQueries` as its read surface.
+
+### 11. client-views
+
+- **Scope.** Tasks, Projects, Review, and Settings, including the two editing
+  doors onto the estimate and the dependency editor with its cycle message.
+- **Does not cover.** The Today view and the tray.
+- **Depends on.** `client-shell`.
+- **Entry criteria.** The shell runs in both modes and the shutdown order is
+  proven.
+- **Hands forward.** A complete desktop client against the specification's five
+  views.
+- **Relies on.** The remaining surface ports, and `CONTEXT.md` for the domain
+  vocabulary the labels use.
+
+## Tray stage
+
+### 12. tray-surface
+
+- **Scope.** The tray icon, the popup showing the current timer, the next item,
+  and critical notices, the native actions, and degradation to the window when
+  no tray exists. It carries the real desktop test across GNOME with and without
+  the app-indicator extension, KDE Plasma, macOS, and Windows, recording
+  `SystemTray.isSupported()` in each.
+- **Does not cover.** Any new planning capability.
+- **Depends on.** `client-views`.
+- **Entry criteria.** The client is complete and packaged as an image.
+- **Hands forward.** v1 itself, the release after this stage.
+- **Relies on.** `prototype-tray-packaging`, with the Linux tray recorded as the
+  weakest part of the JavaFX choice.
+
+## Releases
+
+Settled by `release-plan`. Ten releases: nine inside the pre-v1 run and `1.0`
+after them. Releases are numbered and named by what a user can do with them, and
+tags follow the numbers from `v0.1.0` to `v1.0.0`, so lexical order matches
+release order.
+
+Three rules apply to every release below, and they come from `version-order`:
+
+- no release is called done while a child effort inside it is unfinished;
+- every interface an earlier release shipped keeps working in every later one,
+  and no release removes a command or a surface that already worked;
+- each release is exercised on real data, not on fixtures, and is tagged before
+  the next one opens.
+
+### 0.1 Capture
+
+- **Observable.** Capture a task by title, list and inspect it, start and end
+  the day, run the timer, log and correct time, complete a task.
+- **Efforts.** `scaffolding`, `work-store`, `cli-basics`.
+- **Done when.** A captured task survives a restart, the timer refuses to start
+  before the day is started, and the binary ships as a `jlink` image with JavaFX
+  on the module path.
+
+### 0.2 The work model
+
+- **Observable.** Projects, tasks inside projects, dependencies with derived
+  blocking and a refused cycle carrying its path, estimates with derived
+  remaining, semantic priority, deadlines in both forms, cancel and archive.
+- **Efforts.** `cli-work-model`.
+- **Done when.** A blocked task cannot be started, a cycle is refused with the
+  tasks in the loop named, and an estimate drives the remaining figure.
+
+### 0.3 The day
+
+- **Observable.** A timetable of minutes per weekday, a session with leave time
+  and break minutes, the ordered today list with per-item reasons and the cut
+  line, the month's target and balance with reconciliation.
+- **Efforts.** `cli-planning`.
+- **Done when.** The list is ordered from real data without anyone sorting it by
+  hand, and the fit signal matches the remaining capacity.
+
+### 0.4 Risk
+
+- **Observable.** Forecasts with slack and risk, warnings as notices,
+  operating-system notifications, and the confirmed override.
+- **Efforts.** `cli-forecast`.
+- **Done when.** A missed deadline is reported before it passes where the
+  forecast can place a finish, and an override is recorded, confirmed, and
+  visible afterwards.
+
+### 0.5 Review and export
+
+- **Observable.** Review of past days, the export archive, a database backup,
+  the purge age, the timezone, and settings.
+- **Efforts.** `cli-review`.
+- **Done when.** The core product is usable end to end from the command line,
+  which is the gate the build order sets for opening the agent stage.
+
+### 0.6 Agents
+
+- **Observable.** An agent reads and writes through one tool per operation, with
+  strict schemas, the two-step confirmation, and the change feed.
+- **Efforts.** `mcp-agent-interface`.
+- **Done when.** An agent completes a real operation from a cold start, and
+  nothing writes to standard output in serve mode.
+
+### 0.7 The daemon
+
+- **Observable.** A daemon serving the versioned REST contract and the event
+  stream while no window exists, a remote proxy in split mode, the token rule,
+  graceful stop, and takeover.
+- **Efforts.** `daemon-api`.
+- **Done when.** An external consumer drives the API, a second owner is refused,
+  and a surface switches modes without losing data.
+
+### 0.8 The window
+
+- **Observable.** The JavaFX client with Today, Tasks, Projects, Review, and
+  Settings, running in either mode.
+- **Efforts.** `client-shell`, `client-views`.
+- **Done when.** The command line and the window produce identical plans from
+  identical data.
+
+### 0.9 The tray
+
+- **Observable.** A tray icon, a popup with the current timer, the next item and
+  critical notices, native actions, and degradation to the window when no tray
+  exists.
+- **Efforts.** `tray-surface`.
+- **Done when.** The real desktop test passes on GNOME with and without the app
+  indicator, on KDE Plasma, on macOS, and on Windows.
+
+### 1.0
+
+- **Observable.** No new capability.
+- **Efforts.** None. Every child effort is finished by `0.9`.
+- **Done when.** Every completion signal in specification section 8.8 is
+  demonstrated on real data and every earlier interface still works.
+
+## Requirements traceability
+
+Rebuilt by `requirements-catalog-rebuild`. The directory now comes from the
+whole planning record rather than from a single parsing pass, and every row
+cites the file and the line it came from.
+
+**The catalogue.** `docs/v1/requirements-directory.csv` holds 1159 rows under
+the header `id,order,source_file,line,section,title,status,target,effort,spec,note`.
+The `order` column is the chronology: 0 is the original specification, 1 to 27
+are the twenty-seven planning tasks in the order they were worked, 28 is this
+map, and 29 is `CONTEXT.md`. The extraction itself is frozen beside it in
+`docs/v1/requirements-catalog.csv`, committed as snapshot `a0ee2a8`, with one
+part per source under `docs/v1/catalog/parts/`.
+
+**Why the order matters.** A statement can only be stale because something
+later replaced it, so ordering the corpus by when it was written turns an
+unbounded comparison into a search that only moves backwards. Each disposition
+slice decides its own rows and may flip earlier ones; a later slice overrules an
+earlier one, which mirrors how the decisions were actually made.
+
+**Dispositions.** 977 rows are kept, 82 superseded, 61 duplicate, 25 deferred,
+and 14 refused. Every superseded row names the later row that replaced it, every
+duplicate names the row that states the subject best, and every non-kept row
+carries a note saying why. The deferred rows are the v2 tracker work, the
+post-v1 date gating and recurrence, and the attachments that arrive with them.
+The refused rows are the six glossary terms that describe code internals plus
+eight model options deliberately rejected in v1.
+
+**What an owner means.** `effort` names the first child effort that must satisfy
+a row, not every surface that later shows it, which is why the desktop views
+carry almost no rows of their own: the command line delivers those capabilities
+first. The value `planner-v1` marks the 290 rows this effort discharges itself:
+process rules, evidence a later task consumed, and records it writes. Those rows
+are exempt from specification coverage, and the specification must not copy them
+into the product description.
+
+**The checker.** `docs/v1/check-requirements.py` enforces six rules now: exact
+header, unique identifiers and non-decreasing order, a citation that resolves to
+non-blank source text, the five statuses with a note on every non-kept row, an
+owner that exists on every kept row, and replacement chains that point forward
+in time and terminate. Rule 6 compares the parts to the directory and to the
+catalogue row for row, not merely by count, so a substitution cannot slip
+through.
+
+**The seventh rule, waiting.** When `to-spec` writes the specification, every
+kept row owned by a child effort must be named by exactly one `Covers:` line,
+every cited identifier must exist and be kept, and the `spec` column must name
+the section that covers the row. `to-spec` does not publish until that passes.
+
+**Consistency.** The same `to-spec` run hands the draft to one agent that wrote
+none of the documents, asked only for contradictions and gaps, against the
+shared concepts: the estimate and remaining, the deadline and effective date,
+the notice, the session with its leave and stop times, capacity and target and
+balance, the identifier, the run mode and the authority, and the change cursor.
+
+**Fidelity into the children.** Each child effort's map carries a `## Requirements`
+section listing the identifier ranges it owes, written at creation from the
+`effort` column, and each child's finalize review checks that list row by row.
+
+The build record, including the reviewer findings and their triage, is
+`docs/v1/catalog/triage.md`. The checker is planning tooling for these
+artefacts, not product code, and the build's non-goals do not cover it.

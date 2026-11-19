@@ -1,0 +1,190 @@
+id,status,target,effort,note,deciding_order
+SRC-2.1.1,kept,,cli-basics,,0
+SRC-2.1.2,kept,,cli-work-model,,0
+SRC-2.1.3,kept,,cli-work-model,,0
+SRC-2.1.4,kept,,cli-work-model,,0
+SRC-2.1.5,kept,,cli-planning,,0
+SRC-2.1.6,kept,,cli-work-model,,0
+SRC-2.1.7,kept,,cli-work-model,,0
+SRC-2.1.8,kept,,cli-forecast,,0
+SRC-2.1.9,superseded,MAP-035,,"MAP-035 replaces per-interval availability: a weekday carries only its net work minutes in one window, so clock intervals and the per-interval pause budget retire.",0
+SRC-2.1.10,superseded,MAP-037,,"MAP-037 replaces availability exceptions with time off: one record per date with a minute count and a kind, where zero minutes is the day off.",0
+SRC-2.1.11,superseded,MAP-040,,"MAP-040 replaces the configurable 90-day horizon with fourteen days of concrete allocation and projections beyond them, and the configured local timezone survives.",0
+SRC-2.1.12,superseded,MAP-010,,"MAP-010 replaces the clock-timed capacity itinerary with a timetable, a session and an ordered today list, and deadline then dependency ordering survives.",0
+SRC-2.1.13,kept,,cli-planning,,0
+SRC-2.1.14,kept,,cli-forecast,,0
+SRC-2.1.15,kept,,cli-forecast,,0
+SRC-2.1.16,kept,,cli-forecast,,0
+SRC-2.1.17,superseded,MAP-045,,"MAP-045 makes the single active task a set behind a configuration setting that ships off, and live elapsed time with editable historical entries survives.",0
+SRC-2.1.18,kept,,cli-work-model,,0
+SRC-2.1.19,kept,,client-shell,,0
+SRC-2.1.20,kept,,tray-surface,,0
+SRC-2.1.21,kept,,mcp-agent-interface,,0
+SRC-2.1.22,superseded,MAP-021,,"MAP-021 keeps MCP to a dedicated standard-input subcommand, so the daemon serves the REST API only, and the two run modes survive as standalone and split.",0
+SRC-2.1.23,kept,,daemon-api,,0
+SRC-2.1.24,kept,,cli-review,,0
+SRC-2.1.25,kept,,tray-surface,,0
+SRC-4.1,superseded,MAP-035,,"MAP-035 moves setup to net minutes per weekday, one window, the planned start and the break reserve, so clock intervals and pause budgets retire.",0
+SRC-4.2,superseded,MAP-040,,"MAP-040 takes the planning horizon out of settings, since fourteen days are concrete and projections run past them, and the other preferences survive.",0
+SRC-4.3,kept,,cli-work-model,,0
+SRC-4.4,kept,,cli-work-model,,0
+SRC-4.5,kept,,cli-work-model,,0
+SRC-4.6,kept,,cli-work-model,,0
+SRC-4.7,kept,,cli-work-model,,0
+SRC-4.8,superseded,MAP-010,,"MAP-010 replaces the clock-timed itinerary with a timetable, a session and an ordered today list carrying a fit signal.",0
+SRC-4.9,kept,,cli-planning,,0
+SRC-4.10,kept,,cli-forecast,,0
+SRC-4.11,kept,,cli-forecast,,0
+SRC-4.12,kept,,cli-basics,,0
+SRC-4.13,kept,,cli-basics,,0
+SRC-4.14,kept,,cli-planning,,0
+SRC-4.15,kept,,cli-basics,,0
+SRC-4.16,kept,,cli-review,,0
+SRC-4.17,superseded,MAP-057,,"MAP-057 makes the review compare each past day against the hours expected now on presence, not planned versus logged task time, and upcoming capacity survives.",0
+SRC-4.18,kept,,mcp-agent-interface,,0
+SRC-4.19,kept,,mcp-agent-interface,,0
+SRC-4.20,kept,,mcp-agent-interface,,0
+SRC-4.21,deferred,,,"v2 advisory: the specification scopes tracker plugins to v2, and MAP-030 attaches them as post-v1 work, so the v2 tracker release takes it and no v1 child effort does.",0
+SRC-4.22,deferred,,,"v2 advisory: the specification scopes tracker plugins to v2, and MAP-030 attaches them as post-v1 work, so the v2 tracker release takes it and no v1 child effort does.",0
+SRC-4.23,kept,,cli-review,,0
+SRC-4.24,kept,,tray-surface,,0
+SRC-4.25,kept,,daemon-api,,0
+SRC-4.26,kept,,cli-forecast,,0
+SRC-4.27,kept,,daemon-api,,0
+SRC-4.28,kept,,cli-forecast,,0
+SRC-RULE-ID-1,kept,,work-store,,0
+SRC-RULE-TIME-1,superseded,MAP-042,,"MAP-042 makes a deadline a sealed date-or-instant pair rather than one absolute instant, and absolute instants for time entries with the local timezone survive.",0
+SRC-RULE-ORDER-0,kept,,cli-basics,,0
+SRC-RULE-PRIO-1,kept,,cli-work-model,,0
+SRC-RULE-VAL-1,superseded,MAP-035,,"Under MAP-035 the title, priority, estimate, duration and date clauses survive and the interval, pause-budget and exception-kind clauses retire with the timetable.",0
+SRC-RULE-STATE-1,kept,,work-store,,0
+SRC-RULE-STATE-2,superseded,MAP-045,,MAP-045 makes the single in-progress rule conditional: pausing keeps the task in progress and concurrent tasks are allowed behind a setting that ships off.,0
+SRC-RULE-STATE-3,kept,,cli-work-model,,0
+SRC-RULE-STATE-4,kept,,cli-work-model,,0
+SRC-RULE-STATE-5,kept,,cli-work-model,,0
+SRC-RULE-STATE-6,kept,,cli-work-model,,0
+SRC-RULE-STATE-7,kept,,cli-work-model,,0
+SRC-RULE-STATE-8,kept,,cli-work-model,,0
+SRC-RULE-ELIG-1,kept,,cli-planning,,0
+SRC-RULE-ELIG-2,kept,,cli-planning,,0
+SRC-RULE-ELIG-3,kept,,cli-planning,,0
+SRC-RULE-EFFORT-1,kept,,cli-basics,,0
+SRC-RULE-EFFORT-2,kept,,cli-forecast,,0
+SRC-RULE-EFFORT-3,kept,,cli-planning,,0
+SRC-RULE-EFFORT-4,kept,,cli-planning,,0
+SRC-RULE-EFFORT-5,kept,,cli-basics,,0
+SRC-RULE-EFF-1,kept,,cli-work-model,,0
+SRC-RULE-EFF-2,kept,,cli-work-model,,0
+SRC-RULE-EFF-3,kept,,cli-work-model,,0
+SRC-RULE-CAP-1,superseded,MAP-035,,"MAP-035 replaces weekly intervals with net minutes per weekday in one window, so the overlap rule, the pause budget and the overnight-interval question retire.",0
+SRC-RULE-CAP-2,superseded,MAP-037,,MAP-037 replaces date exceptions with one time-off record per date carrying a minute count and a kind.,0
+SRC-RULE-CAP-3,superseded,MAP-036,,"MAP-036 makes a day's capacity the session's start, leave time and break reserve, and the session takes the place of the capacity override.",0
+SRC-RULE-CAP-4,superseded,MAP-036,,"MAP-036 derives capacity from the session's actual start and its leave time, so the inside-an-interval arithmetic retires.",0
+SRC-RULE-CAP-5,kept,,cli-planning,,0
+SRC-RULE-CAP-6,superseded,MAP-040,,MAP-040 replaces the 90-day default and its 7-to-365 setting with fourteen days of concrete allocation and projections past them marked as approximations.,0
+SRC-RULE-CAP-7,kept,,cli-planning,,0
+SRC-RULE-CAP-8,superseded,MAP-036,,"MAP-036 replaces the pause budget with the session's break reserve, which is still subtracted from capacity and never placed as an item.",0
+SRC-RULE-CLOS-1,kept,,cli-planning,,0
+SRC-RULE-CLOS-2,kept,,cli-planning,,0
+SRC-RULE-CLOS-3,kept,,cli-planning,,0
+SRC-RULE-CLOS-4,kept,,cli-planning,,0
+SRC-RULE-CLOS-5,kept,,cli-planning,,0
+SRC-RULE-SLACK-1,kept,,cli-forecast,,0
+SRC-RULE-SLACK-2,kept,,cli-forecast,,0
+SRC-RULE-SLACK-3,kept,,cli-forecast,,0
+SRC-RULE-RISK-1,kept,,cli-forecast,,0
+SRC-RULE-RISK-2,kept,,cli-forecast,,0
+SRC-RULE-RISK-3,kept,,cli-forecast,,0
+SRC-RULE-RISK-4,kept,,cli-forecast,,0
+SRC-RULE-RISK-5,superseded,MAP-047,,"MAP-047 settles both questions: missed wins when slack is negative or the deadline passed with work remaining, and a task's own ineligibility is unscheduled.",0
+SRC-RULE-ORDER-1,kept,,cli-planning,,0
+SRC-RULE-ORDER-2,kept,,cli-planning,,0
+SRC-RULE-ORDER-3,superseded,MAP-040,,MAP-040 stops re-planning as time passes: the today list is not rebuilt chunk by chunk and only moves a cut line past the leave time.,0
+SRC-RULE-ORDER-4,kept,,cli-planning,,0
+SRC-RULE-ORDER-5,kept,,cli-planning,,0
+SRC-RULE-ALLOC-1,superseded,MAP-010,,"MAP-010 removes clock-timed allocation, so the sixty-minute chunk split at a capacity boundary is replaced by an ordered today list with a fit signal.",0
+SRC-RULE-ALLOC-2,superseded,MAP-010,,"MAP-010 removes clock-timed allocation, so a maximum chunk per interval is replaced by an ordered list bounded by the day's capacity.",0
+SRC-RULE-ALLOC-3,kept,,cli-planning,,0
+SRC-RULE-ALLOC-4,kept,,cli-planning,,0
+SRC-RULE-ALLOC-5,superseded,MAP-040,,"MAP-040 leaves an item without a clock start and end, as a place in the today list bounded by the day's capacity with a cut line, and the reason and explanation survive.",0
+SRC-RULE-ALLOC-6,kept,,cli-planning,,0
+SRC-RULE-FCAST-1,kept,,cli-forecast,,0
+SRC-RULE-FCAST-2,kept,,cli-forecast,,0
+SRC-RULE-FCAST-3,kept,,cli-forecast,,0
+SRC-RULE-FCAST-4,kept,,cli-forecast,,0
+SRC-RULE-FCAST-5,kept,,cli-forecast,,0
+SRC-RULE-FCAST-6,kept,,cli-forecast,,0
+SRC-RULE-REASON-1,kept,,cli-planning,,0
+SRC-RULE-REASON-2,kept,,cli-planning,,0
+SRC-RULE-REASON-3,kept,,cli-planning,,0
+SRC-RULE-WARN-1,superseded,MAP-041,,"MAP-041 replaces the warning taxonomy with notice types at level info or warning and an OS delivery flag, and the critical severity retires.",0
+SRC-RULE-WARN-2,kept,,cli-forecast,,0
+SRC-RULE-WARN-3,superseded,MAP-041,,"MAP-041 removes the critical level, so ordering and the tray follow info and warning rather than critical, warning and informational.",0
+SRC-RULE-WARN-4,kept,,cli-forecast,,0
+SRC-RULE-WARN-5,kept,,cli-forecast,,0
+SRC-RULE-NOTIF-1,kept,,cli-forecast,,0
+SRC-RULE-NOTIF-2,kept,,cli-forecast,,0
+SRC-RULE-NOTIF-3,kept,,cli-forecast,,0
+SRC-RULE-NOTIF-4,kept,,cli-forecast,,0
+SRC-RULE-RECALC-1,kept,,cli-planning,,0
+SRC-RULE-RECALC-2,kept,,cli-planning,,0
+SRC-RULE-RECALC-3,kept,,cli-planning,,0
+SRC-RULE-RECALC-4,kept,,work-store,,0
+SRC-RULE-DET-1,kept,,cli-planning,,0
+SRC-RULE-DET-2,kept,,cli-planning,,0
+SRC-RULE-PRED-1,kept,,cli-forecast,,0
+SRC-RULE-OVERRIDE-1,kept,,cli-forecast,,0
+SRC-RULE-OVERRIDE-2,superseded,MAP-036,,"MAP-036 lets the session absorb the capacity override, so two rules stay overridable instead of three and the absolute constraints survive.",0
+SRC-RULE-OVERRIDE-3,kept,,cli-forecast,,0
+SRC-RULE-OVERRIDE-4,kept,,cli-forecast,,0
+SRC-RULE-OVERRIDE-5,superseded,MAP-036,,"MAP-036 turns the capacity override into a session edit, where staying later or leaving earlier moves the leave time rather than today's working window.",0
+SRC-RULE-OVERRIDE-6,kept,,cli-forecast,,0
+SRC-RULE-ACTIVITY-1,kept,,mcp-agent-interface,,0
+SRC-RULE-ACTIVITY-2,kept,,mcp-agent-interface,,0
+SRC-RULE-ACTIVITY-3,kept,,mcp-agent-interface,,0
+SRC-RULE-ARCH-1,kept,,cli-basics,,0
+SRC-RULE-ARCH-2,kept,,cli-basics,,0
+SRC-RULE-ARCH-3,kept,,cli-basics,,0
+SRC-RULE-ARCH-4,kept,,daemon-api,,0
+SRC-RULE-ARCH-5,kept,,client-shell,,0
+SRC-RULE-ARCH-6,kept,,daemon-api,,0
+SRC-RULE-PLUG-1,deferred,,,"v2 advisory: the specification scopes tracker plugins to v2, and MAP-030 attaches them as post-v1 work, so the v2 tracker release takes it and no v1 child effort does.",0
+SRC-RULE-PLUG-2,deferred,,,"v2 advisory: the specification scopes tracker plugins to v2, and MAP-030 attaches them as post-v1 work, so the v2 tracker release takes it and no v1 child effort does.",0
+SRC-RULE-PLUG-3,deferred,,,"v2 advisory: the specification scopes tracker plugins to v2, and MAP-030 attaches them as post-v1 work, so the v2 tracker release takes it and no v1 child effort does.",0
+SRC-RULE-PLUG-4,deferred,,,"v2 advisory: the specification scopes tracker plugins to v2, and MAP-030 attaches them as post-v1 work, so the v2 tracker release takes it and no v1 child effort does.",0
+SRC-RULE-PLUG-5,deferred,,,"v2 advisory: the specification scopes tracker plugins to v2, and MAP-030 attaches them as post-v1 work, so the v2 tracker release takes it and no v1 child effort does.",0
+SRC-RULE-DATA-1,kept,,cli-basics,,0
+SRC-RULE-DATA-2,kept,,cli-review,,0
+SRC-RULE-DATA-3,kept,,work-store,,0
+SRC-8.8.1,kept,,cli-basics,,0
+SRC-8.8.2,kept,,cli-planning,,0
+SRC-8.8.3,kept,,cli-work-model,,0
+SRC-8.8.4,kept,,cli-work-model,,0
+SRC-8.8.5,kept,,cli-forecast,,0
+SRC-8.8.6,kept,,cli-work-model,,0
+SRC-8.8.7,kept,,cli-planning,,0
+SRC-8.8.8,kept,,cli-forecast,,0
+SRC-8.8.9,kept,,cli-planning,,0
+SRC-8.8.10,kept,,cli-forecast,,0
+SRC-8.8.11,kept,,cli-forecast,,0
+SRC-8.8.12,kept,,tray-surface,,0
+SRC-8.8.13,kept,,mcp-agent-interface,,0
+SRC-8.8.14,kept,,tray-surface,,0
+SRC-8.8.15,kept,,daemon-api,,0
+SRC-8.8.16,kept,,cli-review,,0
+DEC-1,superseded,MAP-043,,"MAP-043 settles it on total effort in one stored field, with remaining effort derived from it and allowed to go negative.",0
+DEC-2,superseded,MAP-042,,"MAP-042 makes a deadline a sealed pair, where a date means before that local day ends and an instant is accepted only for the current local day.",0
+DEC-3,superseded,MAP-060,,MAP-060 detects the run mode instead of choosing a default: the binary attaches to a running daemon and otherwise runs the work logic in its own process.,0
+DEC-4,superseded,MAP-061,,"MAP-061 leaves timers and the session open across a graceful stop, presents anything opened for correction on the next start, and a crash takes the same route.",0
+DEC-5,superseded,MAP-040,,"MAP-040 extends projections past the fourteen days of concrete allocation, marked as approximations and rough beyond four weeks.",0
+DEC-6,superseded,MAP-047,,MAP-047 makes missed win when slack is negative or the deadline passed with work remaining and reserves unscheduled for work that cannot be placed otherwise.,0
+DEC-7,superseded,MAP-048,,MAP-048 grows the reason set to six values by adding earlier_deadline and stable_order.,0
+DEC-8,superseded,MAP-041,,MAP-041 replaces the severity question with a notice level of info or warning and a per-type OS delivery flag.,0
+DEC-9,superseded,MAP-051,,"MAP-051 leaves a refused cycle as an ephemeral notice naming the tasks in the loop, so it does not persist.",0
+DEC-10,superseded,MAP-055,,MAP-055 keeps deletion off request and adds a configurable purge age that permanently deletes cancelled and archived records older than it.,0
+DEC-11,superseded,MAP-056,,"MAP-056 answers removal by confirmation, so removing a past per-date entry asks for confirmation while plan-only removals do not.",0
+DEC-12,superseded,MAP-035,,"MAP-035 leaves a weekday with one window of net minutes and no clock times, so an interval that crosses local midnight cannot be expressed.",0
+DEC-13,superseded,MAP-045,,MAP-045 keeps pausing in progress and returns the previous task to ready when another starts.,0
+DEC-14,superseded,MAP-057,,MAP-057 recomputes each past day's target and presence from current configuration and stores no past itinerary.,0
+DEC-15,superseded,MAP-047,,MAP-047 keeps blocked tied to the dependency graph and makes a task's own ineligibility unscheduled.,0
+DEC-16,superseded,MAP-049,,MAP-049 raises deadline_approaching while an effective deadline falls within a configurable lead window that defaults to twenty-four hours.,0

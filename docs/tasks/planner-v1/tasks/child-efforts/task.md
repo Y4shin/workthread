@@ -3,7 +3,7 @@ type: task
 subtype: grilling
 title: Settle the child-effort list, their scopes, order, and entry criteria
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - spec-additions
 - stack-research
@@ -105,3 +105,116 @@ Reasons:
   also lands in that child: the daemon's process configuration, the surface's
   own configuration, and the business settings that live in the daemon's data
   and are reachable only through the API.
+
+Blocked: Aborted by the human before any decision was settled: the JavaFX UI choice is reopened, so the client efforts cannot be scoped. Unblocks when `ui-framework-research` has reported, and when `ui-framework-prototype` has run if that research names a candidate.
+
+### Ordering note added after the UI framework was reopened
+
+This grilling was opened, and the human aborted it before any question was
+answered. No decision was settled, and nothing in this task's body was
+contradicted. The reason is a new prerequisite: the human does not want the
+desktop client built in JavaFX, and asked for a research task first, then a
+prototype task if the research finds a candidate.
+
+Do not run this grilling again until:
+
+- `ui-framework-research` is done, and
+- `ui-framework-prototype` is done, or deprecated because the research found no
+  candidate.
+
+Reasons:
+
+- Three of the handful of client efforts in the list are scoped by the toolkit.
+  A Compose Multiplatform client, a JavaFX client, and a local web interface
+  differ in module count, in packaging, and in what the tray effort owns.
+- The research may also change the number of efforts before the desktop stage,
+  because a Kotlin module and a Kotlin toolchain are build work that
+  `scaffolding` would own.
+- If the research confirms JavaFX, this note costs one pass. If it does not,
+  the list would have been scoped against a toolkit the human had rejected.
+
+Scope of the reopen, so this grilling does not re-litigate settled decisions:
+the work logic stays in Java, the core stays framework-free, the surface ports
+and the dual-mode rule do not move, and the eight-module graph keeps its
+inward dependencies. Only the toolkit inside the `client` module, the packaging
+route, and the tray mechanism are open.
+
+### The block is lifted
+
+`ui-framework-decision` settled the toolkit: JavaFX ships, on the 21 LTS line,
+and the human declined the prototype. Both prerequisites named in the note above
+are therefore done, and nothing else stands between this grilling and its work.
+
+This task is workable and is the next pass's work. Its `workflow_state` still
+reads `blocked`, because no `tw_*` tool clears that state; the done-marking
+resolves it when the grilling settles. Do not read the state as an obstacle.
+
+The list this grilling produces should now expect a JavaFX `client` module with
+no second language, and it should not carry a Kotlin toolchain in
+`scaffolding`.
+
+### Settled: twelve child efforts in the stage order
+
+The list is recorded in the map's `## Child efforts` section, which the task
+body names as the destination for this result. Twelve efforts, in the settled
+pre-v1 sequence:
+
+1. `scaffolding`, which also ships one empty JavaFX window as a `jlink` image.
+2. `work-store`.
+3. `cli-basics`, plus the minimal day start the timer requires.
+4. `cli-work-model`.
+5. `cli-planning`.
+6. `cli-forecast`.
+7. `cli-review`.
+8. `mcp-agent-interface`.
+9. `daemon-api`.
+10. `client-shell`.
+11. `client-views`.
+12. `tray-surface`.
+
+**Answers taken, all as recommended.** Twelve efforts is the right
+granularity, one per capability area. The data model and persistence stay
+together in their own effort, second. The timer's day-start rule is honoured
+from the first version by giving `cli-basics` a minimal day start whose length
+comes from one configured default, which `cli-planning` later replaces with the
+timetable. The desktop client is two efforts, the shell with Today first.
+`scaffolding` proves a packaged empty window rather than stopping at build
+files, because the module-path rule is enforced by the build.
+
+**Alternatives rejected.**
+
+- Nine efforts, merging three CLI pairs. Rejected because each merged effort
+  would span two capability areas, which the settled order treats as a signal to
+  split.
+- Six efforts, roughly two per stage. Rejected for the same reason, more
+  strongly, because it also merges across stage boundaries.
+- The store folded into `scaffolding`, which would make scaffolding produce
+  product code against the map's non-goals, or into `cli-basics`, which would
+  decide the store's contract under pressure from the first command.
+- Moving the timetable into `cli-basics`, or suspending the day-start rule until
+  `cli-planning` arrives. The first grows the first effort across two capability
+  areas; the second changes observed behaviour between two versions.
+- One client effort, which would span the process setup and four views and delay
+  the first window a user sees.
+- `scaffolding` without a packaged window, which leaves the module-path rule
+  untested until the desktop stage.
+
+**Constraints the list carries.** Dependencies are a strict chain in stage
+order, because versions are additive and each is tagged before the next opens. A
+child is scoped to a capability group, never to a surface. Releases are not
+assigned here; `release-plan` does that.
+
+**Newly discovered work, charted rather than assumed.**
+`cli-surface-convention` is a new grilling task. The specification never
+mentions the command line interface, and nothing on the map settles its command
+vocabulary, output format, or exit codes. Seven of the twelve efforts are CLI
+efforts, so without one convention they would each invent a different one and
+the additive-version rule would be enforced against seven vocabularies. The task
+carries a recommended shape so the grilling starts from something concrete.
+
+**Remaining fog.** None. The one gap found during this grilling is now a task,
+not a fog line.
+
+**Write-back.** The list went to `## Child efforts`, which this task's body
+names as its destination. That section references this task's slug, so the
+done-marking is satisfied.

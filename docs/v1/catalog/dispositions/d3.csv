@@ -1,0 +1,171 @@
+id,status,target,effort,note,deciding_order
+T04-003,superseded,T11-079,,"T11-079 replaces this list with eight modules named `contract`, `core`, `adapters`, `wiring`, `api`, `mcp`, `cli`, and `client`, so `standalone`, `apiclient`, `testkit`, and `daemon` are gone.",11
+T04-005,superseded,T11-079,,"Spring stays in `api` and out of the client JVM, but T11-079 removes the separate `daemon` module and gives `api` the daemon's entry point.",11
+T04-008,superseded,T06-003,,"The disjunction is settled by T06-003: the `org.beryx.jlink` plugin with `--strip-debug --compress zip-6`, with JavaFX on the module path enforced by the build.",6
+T04-011,superseded,T07-010,,"Classpath JavaFX is unsupported but does not fail (T07-003, T07-004), so T07-010 turns the rule into a build check on the module path.",7
+T04-017,superseded,T11-079,,"T11-079 replaces the per-mode module composition with the eight-module graph and the authority chosen at startup, so `standalone` and `apiclient` disappear.",11
+T06-001,kept,,scaffolding,,6
+T06-002,kept,,scaffolding,,6
+T06-003,kept,,scaffolding,,6
+T06-004,kept,,scaffolding,,6
+T06-005,kept,,planner-v1,,6
+T06-006,kept,,tray-surface,,6
+T06-007,kept,,tray-surface,,6
+T06-008,kept,,scaffolding,,6
+T06-009,kept,,tray-surface,,6
+T06-010,kept,,tray-surface,,6
+T06-011,kept,,tray-surface,,6
+T06-012,kept,,scaffolding,,6
+T06-013,kept,,scaffolding,,6
+T06-014,kept,,tray-surface,,6
+T06-015,kept,,tray-surface,,6
+T06-016,kept,,tray-surface,,6
+T07-001,kept,,client-shell,,7
+T07-002,kept,,client-shell,,7
+T07-003,kept,,client-shell,,7
+T07-004,kept,,scaffolding,,7
+T07-005,kept,,client-shell,,7
+T07-006,kept,,client-shell,,7
+T07-007,kept,,client-shell,,7
+T07-008,kept,,scaffolding,,7
+T07-009,kept,,scaffolding,,7
+T07-010,kept,,scaffolding,,7
+T08-001,kept,,planner-v1,,8
+T08-002,kept,,cli-planning,,8
+T08-003,kept,,cli-planning,,8
+T08-004,kept,,cli-planning,,8
+T08-005,kept,,cli-planning,,8
+T08-006,kept,,cli-planning,,8
+T08-007,kept,,cli-planning,,8
+T08-008,kept,,planner-v1,,8
+T08-009,kept,,cli-planning,,8
+T08-010,kept,,cli-planning,,8
+T08-011,kept,,cli-planning,,8
+T08-012,kept,,cli-planning,,8
+T08-013,kept,,cli-planning,,8
+T08-014,kept,,cli-planning,,8
+T09-001,kept,,mcp-agent-interface,,9
+T09-002,kept,,mcp-agent-interface,,9
+T09-003,duplicate,T04-004,,"T04-004 already pins the MCP SDK artifact and version, and this row only repeats the pin and adds that 2.2.0-M2 exists.",9
+T09-004,kept,,scaffolding,,9
+T09-005,kept,,mcp-agent-interface,,9
+T09-006,kept,,mcp-agent-interface,,9
+T09-007,kept,,scaffolding,,9
+T09-008,kept,,mcp-agent-interface,,9
+T09-009,kept,,mcp-agent-interface,,9
+T09-010,kept,,mcp-agent-interface,,9
+T09-011,kept,,mcp-agent-interface,,9
+T09-012,kept,,mcp-agent-interface,,9
+T09-013,kept,,mcp-agent-interface,,9
+T09-014,kept,,mcp-agent-interface,,9
+T09-015,kept,,mcp-agent-interface,,9
+T10-001,kept,,planner-v1,,10
+T10-002,kept,,planner-v1,,10
+T10-003,kept,,planner-v1,,10
+T10-004,kept,,planner-v1,,10
+T10-005,kept,,planner-v1,,10
+T10-006,duplicate,T03-013,,"T03-013 already settles that v1 is the release after the tray stage with every stage inside the pre-v1 run, and this row restates it.",10
+T10-007,kept,,planner-v1,,10
+T10-008,kept,,planner-v1,,10
+T10-009,kept,,planner-v1,,10
+T10-010,kept,,planner-v1,,10
+T10-011,kept,,planner-v1,,10
+T10-012,kept,,planner-v1,,10
+T10-013,kept,,planner-v1,,10
+T10-014,duplicate,T03-003,,"T03-003 already requires every interface an earlier version shipped to keep working at every later one, and this row says the same for releases.",10
+T10-015,duplicate,T03-004,,"T03-004 already requires a version to be tagged before the next one opens, and this row restates it for releases.",10
+T10-016,duplicate,T03-002,,"T03-002 already requires a version to be done by working on real tasks rather than a closed checklist, and this row restates it for releases.",10
+T10-017,kept,,planner-v1,,10
+T10-018,kept,,planner-v1,,10
+T10-019,kept,,planner-v1,,10
+T10-020,kept,,planner-v1,,10
+T11-001,kept,,scaffolding,,11
+T11-002,kept,,scaffolding,,11
+T11-003,kept,,scaffolding,,11
+T11-004,kept,,planner-v1,,11
+T11-005,kept,,planner-v1,,11
+T11-006,kept,,planner-v1,,11
+T11-007,kept,,scaffolding,,11
+T11-008,kept,,planner-v1,,11
+T11-009,kept,,planner-v1,,11
+T11-010,kept,,work-store,,11
+T11-011,kept,,work-store,,11
+T11-012,kept,,work-store,,11
+T11-013,kept,,cli-basics,,11
+T11-014,kept,,cli-forecast,,11
+T11-015,deferred,,,"Deferred to v2: attachments and tracker plugins are post-v1 work (specification section 7), and v1 ships no adapter for either.",11
+T11-016,deferred,,,"Deferred with the attachment port to v2 post-v1 work, whose store needs its own compensation rule.",11
+T11-017,refused,,,Consciously not ports: identifiers are a record-shape question for the domain model and the data directory with the export path is adapter configuration.,11
+T11-018,kept,,scaffolding,,11
+T11-019,kept,,scaffolding,,11
+T11-020,kept,,scaffolding,,11
+T11-021,superseded,T11-031,,The seven surface ports survive; the preferences seam is settled by T11-031 as the reserved port `ForRememberingSurfacePreferences` beside the client's own file adapter.,11
+T11-022,kept,,cli-basics,,11
+T11-023,kept,,cli-work-model,,11
+T11-024,kept,,cli-planning,,11
+T11-025,kept,,cli-basics,,11
+T11-026,kept,,cli-forecast,,11
+T11-027,kept,,cli-planning,,11
+T11-028,kept,,cli-review,,11
+T11-029,kept,,daemon-api,,11
+T11-030,kept,,client-shell,,11
+T11-031,kept,,client-shell,,11
+T11-032,kept,,scaffolding,,11
+T11-033,kept,,cli-planning,,11
+T11-034,kept,,cli-planning,,11
+T11-035,kept,,scaffolding,,11
+T11-036,kept,,scaffolding,,11
+T11-037,kept,,planner-v1,,11
+T11-038,kept,,scaffolding,,11
+T11-039,kept,,scaffolding,,11
+T11-040,kept,,daemon-api,,11
+T11-041,kept,,daemon-api,,11
+T11-042,kept,,daemon-api,,11
+T11-043,duplicate,T11-040,,"T11-040 already puts the API listener on the same footing as the CLI, the MCP server, the client, and the tray, and this row repeats it for the glossary entry.",11
+T11-044,kept,,scaffolding,,11
+T11-045,kept,,scaffolding,,11
+T11-046,kept,,scaffolding,,11
+T11-047,kept,,scaffolding,,11
+T11-048,kept,,scaffolding,,11
+T11-049,kept,,scaffolding,,11
+T11-050,kept,,work-store,,11
+T11-051,kept,,work-store,,11
+T11-052,kept,,work-store,,11
+T11-053,kept,,work-store,,11
+T11-054,kept,,work-store,,11
+T11-055,kept,,work-store,,11
+T11-056,kept,,cli-review,,11
+T11-057,kept,,cli-review,,11
+T11-058,kept,,daemon-api,,11
+T11-059,kept,,daemon-api,,11
+T11-060,kept,,daemon-api,,11
+T11-061,kept,,daemon-api,,11
+T11-062,kept,,daemon-api,,11
+T11-063,kept,,daemon-api,,11
+T11-064,kept,,planner-v1,,11
+T11-065,kept,,daemon-api,,11
+T11-066,kept,,planner-v1,,11
+T11-067,deferred,,,"Deferred to v2 tracker plugin work: v1 ships the port and the built-in implementation, with no plugin contract.",11
+T11-068,deferred,,,"Deferred to v2 tracker plugin work: registration and the plugin's own configuration section arrive with the plugin loader, not in v1.",11
+T11-069,deferred,,,"Deferred to v2 tracker plugin work, because v1 has no plugin choice that startup could fail on.",11
+T11-070,deferred,,,Deferred to v2 tracker plugin work: v1 loads no plugin layer and checks no contract version.,11
+T11-071,deferred,,,"Deferred to v2 tracker plugin work, where the untyped plugin section and the secret handling apply.",11
+T11-072,refused,,,"Consciously not recorded; the plugin work inherits the ownership lock (T11-053), the migration check (T11-055), and the transaction with the change log (T11-011).",11
+T11-073,kept,,scaffolding,,11
+T11-074,kept,,mcp-agent-interface,,11
+T11-075,kept,,mcp-agent-interface,,11
+T11-076,kept,,mcp-agent-interface,,11
+T11-077,kept,,mcp-agent-interface,,11
+T11-078,kept,,daemon-api,,11
+T11-079,kept,,scaffolding,,11
+T11-080,kept,,scaffolding,,11
+T11-081,kept,,scaffolding,,11
+T11-082,kept,,mcp-agent-interface,,11
+T11-083,deferred,,,Deferred to v2 attachment work: the name is reserved and v1 builds no attachment store.,11
+T11-084,kept,,mcp-agent-interface,,11
+T11-085,kept,,client-shell,,11
+T11-086,kept,,client-shell,,11
+T11-087,kept,,client-shell,,11
+T11-088,kept,,scaffolding,,11
+T11-089,kept,,tray-surface,,11
+T11-090,kept,,scaffolding,,11

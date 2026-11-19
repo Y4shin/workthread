@@ -1,0 +1,77 @@
+id,status,target,effort,note,deciding_order
+T21-001,superseded,T22-001,,"T22-001 settles the toolkit the research recommended, so the verdict stops being the operative statement, and T22-002 keeps its no-second-language rule.",21
+T21-002,superseded,T22-003,,"T22-003 settles the same version pin, keeping the 21 LTS line because Java 21 caps the usable line at 23.0.2.",21
+T21-003,superseded,T22-015,,"T22-015 settles that `ui-framework-prototype` never fires, so no framework-choice prototype is earned or run.",21
+T21-004,superseded,T23-007,,"The spike never runs, and T23-007 re-routes its two measurements to the efforts that build the product.",21
+T21-005,kept,,scaffolding,,21
+T21-006,superseded,T23-008,,"T23-008 keeps image size and cold start as measurements owed on this project, with no spike left to take them.",21
+T21-007,superseded,T23-009,,T23-009 keeps the tray test as owed work and names the four desktop environments and the `SystemTray.isSupported()` record.,21
+T21-008,kept,,planner-v1,,21
+T22-001,kept,,client-shell,,22
+T22-002,kept,,scaffolding,,22
+T22-003,kept,,scaffolding,,22
+T22-004,kept,,scaffolding,,22
+T22-005,kept,,planner-v1,,22
+T22-006,kept,,scaffolding,,22
+T22-007,kept,,client-shell,,22
+T22-008,kept,,scaffolding,,22
+T22-009,kept,,scaffolding,,22
+T22-010,kept,,client-shell,,22
+T22-011,kept,,tray-surface,,22
+T22-012,kept,,planner-v1,,22
+T22-013,kept,,tray-surface,,22
+T22-014,kept,,planner-v1,,22
+T22-015,kept,,planner-v1,,22
+T22-016,kept,,planner-v1,,22
+T23-001,duplicate,T22-015,,"T22-015 already settles that `ui-framework-prototype` never fires, and this row restates the gate result as its reason.",23
+T23-002,duplicate,T22-001,,T22-001 and T22-003 already record the settled toolkit and the 21 LTS line that this row restates.,23
+T23-003,duplicate,T22-015,,"T22-015 already settles that no prototype runs, and the human's decline is the reason recorded with that decision.",23
+T23-004,kept,,planner-v1,,23
+T23-005,kept,,planner-v1,,23
+T23-006,kept,,planner-v1,,23
+T23-007,kept,,planner-v1,,23
+T23-008,kept,,scaffolding,,23
+T23-009,kept,,tray-surface,,23
+T23-010,duplicate,T22-013,,"T22-013 already routes the real desktop test to the tray effort with the Wayland and GNOME question, which this row restates.",23
+T24-001,kept,,planner-v1,,24
+T24-002,duplicate,T01-025,,"T01-025 already settles creation at the close with `origin_effort: planner-v1` after a human yes, which this row restates.",24
+T24-003,kept,,planner-v1,,24
+T24-004,kept,,planner-v1,,24
+T24-005,kept,,planner-v1,,24
+T24-006,kept,,planner-v1,,24
+T24-007,kept,,planner-v1,,24
+T24-008,kept,,planner-v1,,24
+T24-009,kept,,planner-v1,,24
+T24-010,kept,,planner-v1,,24
+T24-011,kept,,planner-v1,,24
+T24-012,kept,,planner-v1,,24
+T24-013,kept,,planner-v1,,24
+T24-014,duplicate,T18-015,,"T18-015 already settles the API as a published OpenAPI contract, and this row only draws the consequence for the owning child's scope.",24
+T24-015,kept,,daemon-api,,24
+T24-016,kept,,planner-v1,,24
+T24-017,duplicate,T22-001,,"T22-001, T22-003, and T22-015 already settle the toolkit, the 21 LTS line, and the declined prototype that this row restates as a lifted block.",24
+T24-018,kept,,planner-v1,,24
+T24-019,kept,,planner-v1,,24
+T24-020,kept,,scaffolding,,24
+T24-021,kept,,planner-v1,,24
+T24-022,kept,,cli-basics,,24
+T24-023,kept,,planner-v1,,24
+T24-024,kept,,planner-v1,,24
+T24-025,kept,,planner-v1,,24
+T24-026,kept,,planner-v1,,24
+T24-027,kept,,planner-v1,,24
+T24-028,kept,,planner-v1,,24
+T24-029,kept,,planner-v1,,24
+T24-030,kept,,planner-v1,,24
+T24-031,kept,,planner-v1,,24
+T24-032,kept,,planner-v1,,24
+T24-033,duplicate,T24-021,,"T24-021 already puts the store in its own effort second, and this row adds only the reason the data model and persistence stay together there.",24
+T24-034,duplicate,T24-022,,"T24-022 already gives `cli-basics` the minimal day start, and this row adds only that its length comes from one configured default.",24
+T24-035,kept,,cli-planning,,24
+T24-036,kept,,planner-v1,,24
+T24-037,duplicate,T24-020,,"T24-020 already requires `scaffolding` to ship one empty JavaFX window as a `jlink` image, and this row adds only the module-path reason.",24
+T24-038,kept,,planner-v1,,24
+T24-039,duplicate,T03-020,,"T03-020 already scopes an effort to a capability group rather than a surface such as the CLI, and this row restates it for the child list.",24
+T24-040,duplicate,T24-010,,"T24-010 already leaves release assignment to `release-plan`, and this row repeats the exclusion as a constraint on the list.",24
+T24-041,kept,,planner-v1,,24
+T24-042,kept,,planner-v1,,24

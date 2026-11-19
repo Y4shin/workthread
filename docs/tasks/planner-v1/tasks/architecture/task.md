@@ -268,3 +268,57 @@ The MCP surface is its own module because it is a surface, not a launcher: it ha
 **The attachment port's name, settled.** `ForStoringAttachments`, not `ForStoringData`, for the same reason the naming rule exists: the two names differ only in the word that says nothing here. The port stays reserved for post-v1 work.
 
 **A surface that holds local capabilities of its own.** The human's container example introduced this: an MCP server on another host or in a container cannot read paths the daemon cannot see, so the surface itself must supply those tools. Recorded narrowly, to what follows from settled principles rather than from rules the human has not agreed to: a surface may hold capabilities of its own, and they must never read or write the core's data. Where such a tool is scoped, and how the tool list declares which tools come from the core and which from the surface's own host, are surface-design matters for the MCP work, not architecture decisions.
+
+### The client's toolkit is reopened
+
+Recorded after this task was done, at the human's request. The work logic stays
+in Java, the core stays framework-free, the surface ports and the dual-mode rule
+are unchanged, and the eight-module graph keeps its inward dependencies. The
+toolkit inside the `client` module is open again, and `ui-framework-research`
+then `ui-framework-prototype` decide it. The human does not want JavaFX and will
+accept it only if nothing else fits.
+
+These parts of this record are therefore provisional until that research
+reports:
+
+- Step 10's `client` module, described as the JavaFX client, tray, and desktop
+  entry point. The module boundary and its inward dependencies hold; the toolkit
+  inside it may not.
+- Step 12's definition of `Client` as the JavaFX surface. The definition of a
+  surface, and of the client as one, holds; the word JavaFX may not.
+- The one-JVM shutdown order measured by `prototype-javafx-spring-jvm`. The
+  order itself, surfaces then authority, holds; the specific
+  `Platform.exit()`-then-`context.close()` sequence is a JavaFX result.
+- The `jlink` image rule and its enforcement in the build, which come from
+  `prototype-tray-packaging` and the stack research. A non-JavaFX toolkit may
+  need `jpackage` instead, and its own native artifacts.
+- The tray, an AWT-backed `FXTrayIcon` guarded by `SystemTray.isSupported()`.
+  The degradation rule holds for any toolkit; the mechanism may not.
+
+The research supersedes or confirms each one, and its write-back amends this
+map. Nothing else in this record changes.
+
+### The provisional marks are lifted
+
+The section above marks five parts of this record as provisional pending the UI
+framework research. `ui-framework-decision` settled it: JavaFX ships, on the 21
+LTS line, and the human declined a prototype because JavaFX works natively in
+the Java process.
+
+Each provisional item is confirmed, with the reasoning kept here so a later
+reader does not have to re-derive it:
+
+- The `client` module holds the JavaFX client, the tray, and the desktop entry
+  point. Confirmed.
+- `Client` means the JavaFX surface. Confirmed.
+- The one-JVM shutdown order, `Platform.exit()` on the FX thread, a latch, then
+  `context.close()` on the main thread, is the measured JavaFX sequence.
+  Confirmed.
+- The `jlink` image with JavaFX on the module path, enforced by the build,
+  stands. Confirmed.
+- The AWT-backed tray guarded by `SystemTray.isSupported()` stands, with the
+  Linux weakness now recorded as an accepted risk rather than an open question.
+
+One new constraint, from the research: Java 21 caps the usable JavaFX line at
+23.0.2, because JavaFX 25 needs JDK 23 and JavaFX 27 needs JDK 24. A future JDK
+upgrade is what unlocks a newer JavaFX, not a build change.

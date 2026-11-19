@@ -1,0 +1,194 @@
+id,status,target,effort,note,deciding_order
+SRC-2.1.9,superseded,T02-013,,"T02-013 replaces the weekday intervals with a timetable of hours per weekday, so the per-interval pause budget goes and the break minutes live on the session (T02-011).",2
+SRC-2.1.10,superseded,T02-008,,T02-008 keeps a day off as a recorded time-off entry against a date and drops the replacement-interval kind of exception.,2
+SRC-2.1.11,superseded,T02-010,,T02-010 keeps the configured local timezone and replaces the configurable planning horizon with a projection horizon of two weeks at most.,2
+SRC-2.1.12,superseded,T02-009,,"T02-009 replaces the clock-timed, capacity-constrained itinerary with an ordered today list for the session, and deadline and dependency pressure survive as its ordering inputs.",2
+SRC-2.1.22,superseded,T02-027,,"T02-027 hosts MCP over stdio in the command line interface, which by T02-023 is the daemon's client, so the two run modes survive and the daemon keeps the API alone.",2
+SRC-4.1,superseded,T02-008,,T02-008 keeps the timezone and the day off and replaces working-hours intervals and pause budgets with a timetable of hours per weekday plus recorded time off.,2
+SRC-4.2,superseded,T02-010,,"T02-010 caps the projection horizon at two weeks, so the 7-to-365-day horizon setting this journey configures no longer exists.",2
+SRC-4.8,superseded,T02-009,,T02-009 shows an ordered today list for the session instead of a day-by-day itinerary.,2
+SRC-4.17,superseded,T02-021,,"T02-021 hands the question of what Review compares, now that per-day planned minutes are gone, to the session-and-timetable grilling.",2
+SRC-RULE-CAP-1,superseded,T02-013,,T02-013 turns weekly availability into hours per weekday with no intervals and no per-interval pause budget.,2
+SRC-RULE-CAP-2,superseded,T02-008,,"T02-008 records time off, in advance and retroactively, and drops the replacement-interval exception, so the one-entry-per-date rule survives without its intervals.",2
+SRC-RULE-CAP-3,superseded,T02-011,,"T02-011 computes today's capacity from the session and leaves future days to the timetable, so capacity is no longer expanded per day across a horizon.",2
+SRC-RULE-CAP-4,superseded,T02-011,,"T02-011 starts today's capacity when work starts and ends it at the planned leave time, which replaces the working-interval arithmetic.",2
+SRC-RULE-CAP-6,superseded,T02-010,,T02-010 replaces the 90-day default and the 7-to-365-day setting with a projection horizon of two weeks at most.,2
+SRC-RULE-CAP-8,superseded,T02-011,,"T02-011 turns the pause budget into the session's planned break minutes, so a break is no longer a reserve inside a working interval.",2
+SRC-RULE-ALLOC-1,superseded,T02-012,,T02-012 defers the sixty-minute allocation chunk and the split at an interval boundary to post-v1.,2
+SRC-RULE-ALLOC-2,superseded,T02-012,,"T02-012 takes the sixty-minute chunk out of v1, so its maximum-chunk rule no longer applies.",2
+SRC-RULE-ALLOC-5,superseded,T02-012,,"T02-012 removes clock-time blocks, so a list item carries no start and end, while its machine reason and human explanation survive as SRC-2.1.13.",2
+SRC-RULE-ORDER-3,superseded,T02-012,,"T02-012 removes allocation chunks, so re-evaluating the candidate set after every chunk no longer describes v1.",2
+SRC-RULE-VAL-1,superseded,T02-012,,"T02-012 removes working intervals, pause budgets, and replacement-interval exceptions, so those clauses go while the title, priority, estimate, duration, dependency, and status clauses survive.",2
+DEC-5,superseded,T02-018,,"T02-018 caps the projection horizon at two weeks, which trivialises this question about deadlines beyond the horizon.",2
+DEC-11,superseded,T02-019,,T02-019 restates the question as how a time-off entry is removed.,2
+DEC-12,superseded,T02-019,,"T02-019 makes this moot, because the timetable stores hours per weekday and has no interval to cross midnight.",2
+T01-001,kept,,cli-basics,,1
+T01-002,kept,,planner-v1,,1
+T01-003,kept,,planner-v1,,1
+T01-004,kept,,planner-v1,,1
+T01-005,kept,,planner-v1,,1
+T01-006,kept,,planner-v1,,1
+T01-007,kept,,planner-v1,,1
+T01-008,kept,,planner-v1,,1
+T01-009,kept,,planner-v1,,1
+T01-010,kept,,planner-v1,,1
+T01-011,kept,,planner-v1,,1
+T01-012,kept,,planner-v1,,1
+T01-013,kept,,planner-v1,,1
+T01-014,kept,,planner-v1,,1
+T01-015,kept,,planner-v1,,1
+T01-016,kept,,planner-v1,,1
+T01-017,kept,,planner-v1,,1
+T01-018,kept,,planner-v1,,1
+T01-019,kept,,planner-v1,,1
+T01-020,kept,,planner-v1,,1
+T01-021,kept,,planner-v1,,1
+T01-022,kept,,scaffolding,,1
+T01-023,kept,,planner-v1,,1
+T01-024,kept,,planner-v1,,1
+T01-025,kept,,planner-v1,,1
+T01-026,kept,,planner-v1,,1
+T01-027,kept,,planner-v1,,1
+T01-028,kept,,planner-v1,,1
+T01-029,kept,,planner-v1,,1
+T01-030,kept,,planner-v1,,1
+T01-031,kept,,planner-v1,,1
+T01-032,kept,,planner-v1,,1
+T01-033,kept,,planner-v1,,1
+T01-034,kept,,planner-v1,,1
+T01-035,kept,,planner-v1,,1
+T02-001,kept,,planner-v1,,2
+T02-002,kept,,planner-v1,,2
+T02-003,kept,,planner-v1,,2
+T02-004,kept,,planner-v1,,2
+T02-005,kept,,planner-v1,,2
+T02-006,kept,,planner-v1,,2
+T02-007,kept,,planner-v1,,2
+T02-008,kept,,cli-planning,,2
+T02-009,kept,,cli-planning,,2
+T02-010,kept,,cli-forecast,,2
+T02-011,kept,,cli-planning,,2
+T02-012,kept,,planner-v1,,2
+T02-013,kept,,cli-planning,,2
+T02-014,kept,,cli-planning,,2
+T02-015,kept,,cli-planning,,2
+T02-016,kept,,planner-v1,,2
+T02-017,kept,,planner-v1,,2
+T02-018,kept,,planner-v1,,2
+T02-019,kept,,planner-v1,,2
+T02-020,kept,,planner-v1,,2
+T02-021,kept,,planner-v1,,2
+T02-022,kept,,planner-v1,,2
+T02-023,kept,,planner-v1,,2
+T02-024,kept,,cli-basics,,2
+T02-025,kept,,planner-v1,,2
+T02-026,kept,,planner-v1,,2
+T02-027,kept,,cli-basics,,2
+T02-028,kept,,planner-v1,,2
+T02-029,kept,,planner-v1,,2
+T02-030,kept,,planner-v1,,2
+T02-031,kept,,planner-v1,,2
+T02-032,kept,,mcp-agent-interface,,2
+T02-033,kept,,planner-v1,,2
+T02-034,kept,,planner-v1,,2
+T02-035,kept,,planner-v1,,2
+T02-036,kept,,planner-v1,,2
+T02-037,kept,,planner-v1,,2
+T02-038,kept,,planner-v1,,2
+T02-039,kept,,planner-v1,,2
+T03-001,kept,,scaffolding,,3
+T03-002,kept,,planner-v1,,3
+T03-003,kept,,scaffolding,,3
+T03-004,kept,,scaffolding,,3
+T03-005,kept,,cli-basics,,3
+T03-006,kept,,planner-v1,,3
+T03-007,kept,,cli-basics,,3
+T03-008,kept,,cli-basics,,3
+T03-009,kept,,planner-v1,,3
+T03-010,kept,,planner-v1,,3
+T03-011,kept,,daemon-api,,3
+T03-012,kept,,scaffolding,,3
+T03-013,kept,,planner-v1,,3
+T03-014,kept,,planner-v1,,3
+T03-015,kept,,planner-v1,,3
+T03-016,kept,,planner-v1,,3
+T03-017,kept,,planner-v1,,3
+T03-018,kept,,planner-v1,,3
+T03-019,duplicate,T03-003,,"T03-003 states the same additive-versions rule for every stage and version, so this row only narrows it to the CLI stage.",3
+T03-020,kept,,planner-v1,,3
+T03-021,kept,,planner-v1,,3
+T03-022,kept,,planner-v1,,3
+T03-023,kept,,planner-v1,,3
+T03-024,kept,,planner-v1,,3
+T04-001,kept,,scaffolding,,4
+T04-002,kept,,scaffolding,,4
+T04-003,kept,,scaffolding,,4
+T04-004,kept,,scaffolding,,4
+T04-005,kept,,daemon-api,,4
+T04-006,kept,,work-store,,4
+T04-007,kept,,scaffolding,,4
+T04-008,kept,,scaffolding,,4
+T04-009,kept,,scaffolding,,4
+T04-010,duplicate,T04-004,,"T04-004 already pins 2.1.0, so this row adds only the reason for the pin.",4
+T04-011,kept,,client-shell,,4
+T04-012,kept,,client-shell,,4
+T04-013,kept,,scaffolding,,4
+T04-014,kept,,work-store,,4
+T04-015,kept,,scaffolding,,4
+T04-016,kept,,scaffolding,,4
+T04-017,kept,,daemon-api,,4
+T04-018,kept,,scaffolding,,4
+T05-001,kept,,planner-v1,,5
+T05-002,kept,,planner-v1,,5
+T05-003,kept,,planner-v1,,5
+T05-004,kept,,planner-v1,,5
+T05-005,kept,,planner-v1,,5
+T05-006,kept,,planner-v1,,5
+T05-007,kept,,planner-v1,,5
+T05-008,kept,,planner-v1,,5
+T05-009,kept,,planner-v1,,5
+T05-010,kept,,planner-v1,,5
+T05-011,kept,,planner-v1,,5
+T05-012,kept,,planner-v1,,5
+T05-013,kept,,planner-v1,,5
+T05-014,kept,,planner-v1,,5
+T05-015,kept,,planner-v1,,5
+T05-016,kept,,planner-v1,,5
+T05-017,kept,,planner-v1,,5
+T05-018,kept,,planner-v1,,5
+T05-019,kept,,planner-v1,,5
+T05-020,kept,,planner-v1,,5
+T05-021,kept,,planner-v1,,5
+T05-022,kept,,planner-v1,,5
+T05-023,kept,,planner-v1,,5
+T05-024,kept,,planner-v1,,5
+T05-025,kept,,planner-v1,,5
+T05-026,kept,,planner-v1,,5
+T05-027,kept,,planner-v1,,5
+T05-028,kept,,planner-v1,,5
+T05-029,kept,,planner-v1,,5
+T05-030,kept,,planner-v1,,5
+T05-031,kept,,planner-v1,,5
+T05-032,kept,,planner-v1,,5
+T05-033,kept,,planner-v1,,5
+T05-034,kept,,planner-v1,,5
+T05-035,kept,,planner-v1,,5
+T05-036,kept,,planner-v1,,5
+T05-037,kept,,planner-v1,,5
+T05-038,kept,,planner-v1,,5
+T05-039,kept,,planner-v1,,5
+T05-040,kept,,planner-v1,,5
+T05-041,kept,,planner-v1,,5
+T05-042,kept,,planner-v1,,5
+T05-043,kept,,planner-v1,,5
+T05-044,kept,,planner-v1,,5
+T05-045,kept,,planner-v1,,5
+T05-046,kept,,planner-v1,,5
+T05-047,kept,,planner-v1,,5
+T05-048,kept,,planner-v1,,5
+T05-049,kept,,planner-v1,,5
+T05-050,kept,,planner-v1,,5
+T05-051,kept,,work-store,,5
+T05-052,kept,,work-store,,5
+T05-053,kept,,work-store,,5
+T05-054,kept,,work-store,,5

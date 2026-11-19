@@ -1,0 +1,173 @@
+id,status,target,effort,note,deciding_order
+SRC-RULE-STATE-6,superseded,T17-006,,"Cancelling instead of deleting on request, and the confirmed deletion of time entries, survive, and T17-006 adds a purge age that permanently deletes cancelled and archived records older than it.",17
+SRC-RULE-OVERRIDE-4,superseded,T013,,"T013 replaces the attached-interactive-surface rule with the delivery ladder, which ends in a private log file or a free stream, so explicit intent and no self-confirmation survive while a daemon with no window can now confirm.",16
+SRC-RULE-ARCH-6,superseded,T18-001,,"The stop-then-start rule and single ownership survive, and T18-001 makes the mode detected at run time rather than a deployment choice.",18
+DEC-3,superseded,T18-001,,"T18-001 answers it: the mode is detected, attaching to a running daemon and otherwise running the work logic in its own process, so there is no configured default installation.",18
+DEC-4,superseded,T18-006,,"T18-006 answers it: a graceful stop records the instant in the operation log and leaves open timers and the session open, and T18-007 presents them for correction on the next start.",18
+DEC-9,superseded,T002,,T002 answers it: the refused cycle leaves an ephemeral notice naming the tasks in the loop and is not a persistent condition.,16
+DEC-10,superseded,T17-006,,"T17-006 answers it: nothing is deleted on request (T17-005), and a purge age that ships off permanently deletes cancelled and archived records older than it.",17
+DEC-11,superseded,T17-003,,"T17-003 answers the re-scoped question: removing a per-date entry is an explicit removal, and T17-013 asks for confirmation only when the entry is on a past date.",17
+DEC-12,superseded,T17-004,,"T17-004 answers it: a weekday is a minute count inside one local day, so a working day never crosses midnight.",17
+DEC-14,superseded,T17-016,,"T17-016 answers it: each past day's target and presence are recomputed from current configuration when the review is shown, and no past itinerary is stored or reconstructed.",17
+T11-026,superseded,T012,,"T012 replaces the confirmation channel carried in the call with a recorded pending operation whose code reaches the human out of band, so a headless daemon answers `confirmation_unavailable` only with no channel at all (T017).",16
+T11-029,superseded,T18-001,,"T18-001 detects the mode instead of reading it from startup configuration, while resolving it before the core starts and keeping the horizon off the port both survive.",18
+T11-057,superseded,T17-025,,"T17-025 splits the artifacts: the export is a documented JSON document that survives the application and the database copy is the backup, so the data directory is no longer the export, while the reason runtime state moved out of it survives.",17
+T13-043,superseded,T003,,"T003 renames the lifetime, keeping persistent and turning the one-off into an ephemeral notice that stays until dismissed, while the level, entity reference, message, and OS-delivery flag survive.",16
+T001,kept,,cli-work-model,,16
+T002,kept,,cli-forecast,,16
+T003,kept,,cli-forecast,,16
+T004,kept,,cli-forecast,,16
+T005,kept,,mcp-agent-interface,,16
+T006,kept,,mcp-agent-interface,,16
+T007,kept,,mcp-agent-interface,,16
+T008,kept,,mcp-agent-interface,,16
+T009,kept,,mcp-agent-interface,,16
+T010,kept,,mcp-agent-interface,,16
+T011,kept,,mcp-agent-interface,,16
+T012,kept,,mcp-agent-interface,,16
+T013,kept,,cli-forecast,,16
+T014,kept,,mcp-agent-interface,,16
+T015,kept,,mcp-agent-interface,,16
+T016,kept,,cli-forecast,,16
+T017,kept,,mcp-agent-interface,,16
+T018,kept,,mcp-agent-interface,,16
+T019,kept,,mcp-agent-interface,,16
+T020,kept,,mcp-agent-interface,,16
+T021,kept,,work-store,,16
+T022,kept,,work-store,,16
+T023,kept,,work-store,,16
+T024,kept,,cli-forecast,,16
+T025,kept,,cli-forecast,,16
+T026,kept,,cli-forecast,,16
+T027,kept,,work-store,,16
+T028,kept,,work-store,,16
+T029,kept,,cli-forecast,,16
+T030,kept,,cli-forecast,,16
+T031,kept,,daemon-api,,16
+T032,kept,,work-store,,16
+T033,kept,,work-store,,16
+T034,kept,,cli-review,,16
+T035,kept,,mcp-agent-interface,,16
+T036,kept,,client-views,,16
+T037,kept,,cli-basics,,16
+T038,kept,,planner-v1,,16
+T17-001,duplicate,T13-017,,T13-017 already replaces availability exceptions with one per-date time-off record carrying a minute count and a vacation or flex kind.,17
+T17-002,duplicate,T13-004,,T13-004 already replaces the clock intervals with one net minute count per weekday and one window inside a single local day.,17
+T17-003,kept,,cli-planning,,17
+T17-004,kept,,cli-planning,,17
+T17-005,kept,,cli-work-model,,17
+T17-006,kept,,cli-review,,17
+T17-007,kept,,cli-review,,17
+T17-008,kept,,work-store,,17
+T17-009,kept,,cli-review,,17
+T17-010,kept,,work-store,,17
+T17-011,kept,,cli-review,,17
+T17-012,kept,,cli-review,,17
+T17-013,kept,,cli-planning,,17
+T17-014,kept,,cli-work-model,,17
+T17-015,kept,,work-store,,17
+T17-016,kept,,cli-review,,17
+T17-017,kept,,cli-review,,17
+T17-018,kept,,cli-review,,17
+T17-019,kept,,cli-review,,17
+T17-020,kept,,cli-review,,17
+T17-021,kept,,cli-review,,17
+T17-022,deferred,,,"Post-v1: attachments arrive with the later attachment work, and T17-020's zip archive already reserves the directory so the layout does not change shape then.",17
+T17-023,kept,,cli-review,,17
+T17-024,kept,,cli-review,,17
+T17-025,kept,,cli-review,,17
+T17-026,kept,,cli-review,,17
+T17-027,kept,,cli-review,,17
+T17-028,kept,,work-store,,17
+T17-029,kept,,work-store,,17
+T17-030,kept,,work-store,,17
+T17-031,kept,,work-store,,17
+T17-032,kept,,work-store,,17
+T17-033,kept,,work-store,,17
+T17-034,kept,,work-store,,17
+T17-035,kept,,scaffolding,,17
+T17-036,kept,,scaffolding,,17
+T17-037,kept,,work-store,,17
+T17-038,kept,,work-store,,17
+T17-039,kept,,cli-planning,,17
+T17-040,kept,,mcp-agent-interface,,17
+T17-041,kept,,work-store,,17
+T17-042,kept,,planner-v1,,17
+T17-043,deferred,,,"Post-v1: the specification excludes an import from v1 and no planned release carries one, so the rule binds whichever later effort adds an import after T17-020 fixes the documented format.",17
+T18-001,kept,,daemon-api,,18
+T18-002,kept,,daemon-api,,18
+T18-003,kept,,cli-basics,,18
+T18-004,kept,,daemon-api,,18
+T18-005,kept,,daemon-api,,18
+T18-006,kept,,daemon-api,,18
+T18-007,kept,,daemon-api,,18
+T18-008,kept,,daemon-api,,18
+T18-009,kept,,cli-basics,,18
+T18-010,kept,,daemon-api,,18
+T18-011,kept,,daemon-api,,18
+T18-012,kept,,client-shell,,18
+T18-013,kept,,daemon-api,,18
+T18-014,kept,,daemon-api,,18
+T18-015,kept,,daemon-api,,18
+T18-016,kept,,daemon-api,,18
+T18-017,kept,,daemon-api,,18
+T18-018,kept,,daemon-api,,18
+T18-019,superseded,T20-001,,"T20-001 lifts the pull-only rule for v1, while the filtered reads, the cursor feed, and notices and confirmations as resources survive.",18
+T18-020,superseded,T20-001,,Both created tasks ran: T20-001 settles on server-sent events and T20-003 refuses WebSockets for v1.,18
+T18-021,kept,,planner-v1,,18
+T18-022,kept,,daemon-api,,18
+T18-023,kept,,mcp-agent-interface,,18
+T18-024,duplicate,T18-009,,"T18-009 already gives an open time entry the same startup correction as an unended day, and this row restates it for session-and-timetable.",18
+T18-025,kept,,work-store,,18
+T18-026,kept,,planner-v1,,18
+T18-027,kept,,planner-v1,,18
+T18-028,duplicate,T18-027,,"T18-027 already records both tasks created in this pass, blocked in order, which covers this task and its blocker.",18
+T18-029,duplicate,T18-027,,"T18-027 already records both tasks created in this pass, blocked in order, which covers this task and its blocker.",18
+T19-001,duplicate,T18-015,,"T18-015 already settles the API as a versioned, OpenAPI-documented REST contract usable by consumers outside the application.",19
+T19-002,superseded,T20-001,,T20-001 says otherwise: v1 ships server-sent events beside the pull reads.,19
+T19-003,kept,,daemon-api,,19
+T19-004,superseded,T20-004,,"T20-004 names and settles the distinction: the stream carries change notifications and notices, never projections, which stay REST reads.",19
+T19-005,kept,,planner-v1,,19
+T19-006,kept,,planner-v1,,19
+T19-007,kept,,planner-v1,,19
+T19-008,kept,,planner-v1,,19
+T19-009,kept,,planner-v1,,19
+T19-010,kept,,planner-v1,,19
+T19-011,kept,,planner-v1,,19
+T19-012,kept,,planner-v1,,19
+T19-013,superseded,T20-001,,The finding became the decision: T20-001 ships server-sent events on the evidence this row records.,19
+T19-014,kept,,daemon-api,,19
+T19-015,kept,,daemon-api,,19
+T19-016,kept,,daemon-api,,19
+T19-017,kept,,daemon-api,,19
+T19-018,kept,,daemon-api,,19
+T19-019,kept,,daemon-api,,19
+T19-020,kept,,daemon-api,,19
+T19-021,kept,,daemon-api,,19
+T19-022,superseded,T20-001,,The open question is closed: T20-001 decides the live channel and T20-003 refuses WebSockets.,19
+T20-001,kept,,daemon-api,,20
+T20-002,kept,,daemon-api,,20
+T20-003,refused,,,"WebSockets are consciously not adopted for v1 on the recorded evidence, and T20-001 ships server-sent events with Last-Event-ID resumption instead.",20
+T20-004,kept,,daemon-api,,20
+T20-005,kept,,daemon-api,,20
+T20-006,kept,,daemon-api,,20
+T20-007,kept,,daemon-api,,20
+T20-008,kept,,daemon-api,,20
+T20-009,kept,,daemon-api,,20
+T20-010,kept,,daemon-api,,20
+T20-011,kept,,daemon-api,,20
+T20-012,kept,,daemon-api,,20
+T20-013,kept,,daemon-api,,20
+T20-014,kept,,daemon-api,,20
+T20-015,kept,,daemon-api,,20
+T20-016,duplicate,T20-002,,"T20-002 already makes the change cursor the resumption mechanism, carried back as the Last-Event-ID header that the event id holds.",20
+T20-017,kept,,daemon-api,,20
+T20-018,kept,,daemon-api,,20
+T20-019,kept,,planner-v1,,20
+T20-020,kept,,planner-v1,,20
+T20-021,kept,,mcp-agent-interface,,20
+T20-022,kept,,cli-forecast,,20
+T20-023,kept,,work-store,,20
+T20-024,kept,,planner-v1,,20
+T20-025,kept,,planner-v1,,20
+T20-026,kept,,planner-v1,,20

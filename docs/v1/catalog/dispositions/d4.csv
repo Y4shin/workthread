@@ -1,0 +1,209 @@
+id,status,target,effort,note,deciding_order
+T12-001,kept,,work-store,,12
+T12-002,kept,,work-store,,12
+T12-003,kept,,cli-basics,,12
+T12-004,kept,,cli-basics,,12
+T12-005,kept,,work-store,,12
+T12-006,deferred,,,"post-v1: no import exists in v1 and no planned release carries one, so the rule binds whichever later effort adds an import, while a file-copy restore stays covered by T12-005.",12
+T12-007,kept,,work-store,,12
+T12-008,kept,,cli-basics,,12
+T12-009,kept,,work-store,,12
+T12-010,kept,,work-store,,12
+T12-011,kept,,work-store,,12
+T12-012,kept,,work-store,,12
+T12-013,kept,,work-store,,12
+T12-014,kept,,work-store,,12
+T12-015,kept,,planner-v1,,12
+T12-016,kept,,cli-review,,12
+T12-017,refused,,,"not adopted for v1 because it moves eligibility, warnings, and the fit signal at once; it is the first named post-v1 change (T12-018).",12
+T12-018,deferred,,,"post-v1: it is the first change after v1 (T12-017), ahead of recurrence (T12-023), and no pre-v1 release carries it.",12
+T12-019,deferred,,,"post-v1: it is the shape the first post-v1 change (T12-017) takes, one not-before date, so no v1 effort builds it.",12
+T12-020,deferred,,,"post-v1: the change (T12-017) arrives after v1 through its own grilling, never as a field added quietly.",12
+T12-021,refused,,,"not adopted for v1; it is the second named post-v1 change (T12-023), in the template-and-instances shape of T12-022.",12
+T12-022,deferred,,,"post-v1: it is the reference shape for recurrence (T12-021), a template record plus instances with a per-instance status ledger, and no v1 effort builds it.",12
+T12-023,deferred,,,"post-v1: recurrence is the second change after v1, behind date gating (T12-018), and no pre-v1 release carries it.",12
+T12-024,duplicate,T12-017,,"it summarises the refusals stated in T12-017, T12-021, T12-025, T12-027, and T12-028.",12
+T12-025,refused,,,"rejected for v1 with no scheduled return, with the revisit trigger being a cross-project cut such as everything waiting on someone else.",12
+T12-026,kept,,cli-work-model,,12
+T12-027,refused,,,"rejected for v1; the post-v1 plugin story supplies the extension point with a port, a configuration schema, and validation.",12
+T12-028,refused,,,"rejected, so the 1 to 5 priority stays the only importance signal, after deadline and dependency pressure (T12-034).",12
+T12-029,kept,,work-store,,12
+T12-030,kept,,cli-work-model,,12
+T12-031,kept,,work-store,,12
+T12-032,kept,,work-store,,12
+T12-033,kept,,work-store,,12
+T12-034,kept,,cli-work-model,,12
+T12-035,kept,,cli-work-model,,12
+T12-036,kept,,cli-work-model,,12
+T12-037,kept,,cli-work-model,,12
+T12-038,kept,,work-store,,12
+T12-039,duplicate,T12-015,,it restates the deviation that T12-015 records together with where the deviation is carried.,12
+T12-040,kept,,planner-v1,,12
+T12-041,kept,,planner-v1,,12
+T13-001,kept,,cli-planning,,13
+T13-002,kept,,cli-planning,,13
+T13-003,kept,,cli-planning,,13
+T13-004,kept,,cli-planning,,13
+T13-005,kept,,cli-planning,,13
+T13-006,kept,,cli-planning,,13
+T13-007,kept,,cli-planning,,13
+T13-008,kept,,cli-planning,,13
+T13-009,kept,,cli-planning,,13
+T13-010,kept,,cli-planning,,13
+T13-011,kept,,cli-planning,,13
+T13-012,kept,,cli-planning,,13
+T13-013,kept,,cli-planning,,13
+T13-014,kept,,cli-planning,,13
+T13-015,kept,,cli-planning,,13
+T13-016,kept,,cli-planning,,13
+T13-017,kept,,cli-planning,,13
+T13-018,kept,,cli-planning,,13
+T13-019,kept,,cli-planning,,13
+T13-020,kept,,cli-planning,,13
+T13-021,kept,,cli-planning,,13
+T13-022,kept,,cli-planning,,13
+T13-023,kept,,cli-planning,,13
+T13-024,kept,,cli-planning,,13
+T13-025,kept,,cli-planning,,13
+T13-026,kept,,cli-planning,,13
+T13-027,kept,,cli-planning,,13
+T13-028,kept,,cli-planning,,13
+T13-029,kept,,cli-planning,,13
+T13-030,kept,,cli-planning,,13
+T13-031,kept,,planner-v1,,13
+T13-032,kept,,cli-work-model,,13
+T13-033,kept,,cli-work-model,,13
+T13-034,kept,,cli-work-model,,13
+T13-035,kept,,cli-work-model,,13
+T13-036,kept,,cli-work-model,,13
+T13-037,duplicate,T13-032,,"it only records that the deadline of the earlier task model is refined, which T13-032 states as the sealed pair.",13
+T13-038,kept,,cli-planning,,13
+T13-039,kept,,cli-planning,,13
+T13-040,kept,,cli-planning,,13
+T13-041,kept,,cli-planning,,13
+T13-042,kept,,cli-forecast,,13
+T13-043,kept,,cli-forecast,,13
+T13-044,kept,,planner-v1,,13
+T13-045,kept,,cli-forecast,,13
+T13-046,kept,,cli-forecast,,13
+T13-047,kept,,cli-forecast,,13
+T13-048,kept,,cli-forecast,,13
+T13-049,kept,,cli-forecast,,13
+T13-050,kept,,cli-review,,13
+T13-051,kept,,cli-review,,13
+T13-052,duplicate,T13-023,,it restates for the review what T13-023 settles for the month's account.,13
+T13-053,kept,,cli-planning,,13
+T13-054,kept,,cli-planning,,13
+T13-055,kept,,cli-forecast,,13
+T13-056,kept,,cli-planning,,13
+T13-057,kept,,planner-v1,,13
+T13-058,kept,,planner-v1,,13
+T13-059,kept,,planner-v1,,13
+T13-060,duplicate,T13-032,,it restates the sealed date-or-instant pair already stated by T13-032.,13
+T13-061,duplicate,T13-023,,it restates the exclusion of task time from the month's account that T13-023 settles.,13
+T13-062,duplicate,T13-042,,it restates the notice model and type list of T13-042 to T13-049 as a consequence for another task.,13
+T13-063,duplicate,T13-014,,"it restates the inferred session end as provisional, which T13-014 settles.",13
+T13-064,kept,,mcp-agent-interface,,13
+T13-065,kept,,cli-planning,,13
+T13-066,duplicate,T13-023,,"it restates that the review compares presence rather than task time, settled by T13-023.",13
+T14-001,kept,,cli-work-model,,14
+T14-002,kept,,cli-work-model,,14
+T14-003,kept,,cli-work-model,,14
+T14-004,kept,,cli-work-model,,14
+T14-005,kept,,cli-work-model,,14
+T14-006,kept,,cli-planning,,14
+T14-007,kept,,cli-planning,,14
+T14-008,kept,,cli-forecast,,14
+T14-009,kept,,cli-work-model,,14
+T14-010,kept,,cli-basics,,14
+T14-011,kept,,cli-basics,,14
+T14-012,kept,,cli-basics,,14
+T14-013,kept,,cli-basics,,14
+T14-014,kept,,cli-basics,,14
+T14-015,kept,,cli-basics,,14
+T14-016,duplicate,T14-013,,it spells out the conditional status of the two at-most-one rules that the concurrency setting of T14-013 creates.,14
+T14-017,kept,,cli-basics,,14
+T14-018,kept,,cli-basics,,14
+T14-019,kept,,cli-planning,,14
+T14-020,kept,,cli-basics,,14
+T14-021,kept,,client-views,,14
+T14-022,kept,,cli-work-model,,14
+T14-023,duplicate,T14-019,,it restates ending the day and the day-started precondition settled by T14-019 and T14-020.,14
+T14-024,kept,,planner-v1,,14
+T14-025,duplicate,T14-008,,it restates the persistent estimate_overrun notice that T14-008 settles.,14
+T14-026,duplicate,T14-014,,it restates the explicit concurrent start and the failed start without a session that T14-014 and T14-020 settle.,14
+T14-027,duplicate,T14-017,,it restates the concurrency list in the tray and the two estimate doors settled by T14-017 and T14-003.,14
+T15-001,duplicate,T13-032,,it restates the sealed date-or-instant deadline stated by T13-032.,15
+T15-002,duplicate,T13-033,,"it restates what a date deadline means, settled by T13-033.",15
+T15-003,duplicate,T13-034,,"it restates the current-day limit on an instant deadline, settled by T13-034.",15
+T15-004,duplicate,T13-053,,it restates the fourteen-day concrete allocation settled by T13-053.,15
+T15-005,duplicate,T13-054,,it restates the projection past the allocation settled by T13-054.,15
+T15-006,kept,,cli-forecast,,15
+T15-007,kept,,cli-forecast,,15
+T15-008,kept,,cli-forecast,,15
+T15-009,kept,,cli-forecast,,15
+T15-010,kept,,cli-forecast,,15
+T15-011,kept,,cli-forecast,,15
+T15-012,kept,,cli-planning,,15
+T15-013,kept,,cli-planning,,15
+T15-014,kept,,cli-planning,,15
+T15-015,kept,,cli-planning,,15
+T15-016,kept,,cli-forecast,,15
+T15-017,kept,,cli-forecast,,15
+T15-018,kept,,cli-forecast,,15
+T15-019,kept,,cli-forecast,,15
+T15-020,kept,,cli-forecast,,15
+T15-021,kept,,cli-forecast,,15
+T15-022,kept,,cli-forecast,,15
+T15-023,kept,,cli-forecast,,15
+T15-024,kept,,cli-forecast,,15
+T15-025,kept,,cli-forecast,,15
+T15-026,kept,,cli-forecast,,15
+T15-027,kept,,cli-forecast,,15
+T15-028,kept,,cli-forecast,,15
+T15-029,kept,,cli-forecast,,15
+T15-030,kept,,cli-forecast,,15
+T15-031,kept,,cli-forecast,,15
+T15-032,kept,,cli-forecast,,15
+T15-033,kept,,cli-forecast,,15
+T15-034,duplicate,T15-016,,it restates the tenth notice type that T15-016 introduces.,15
+T15-035,kept,,planner-v1,,15
+T15-036,duplicate,T14-008,,it restates the estimate_overrun notice at level info that T14-008 settles.,15
+T15-037,duplicate,T13-064,,it restates the agent rule on notice dismissal that T13-064 states in full.,15
+T15-038,kept,,cli-forecast,,15
+T15-039,kept,,cli-forecast,,15
+T15-040,kept,,cli-forecast,,15
+T15-041,kept,,cli-forecast,,15
+SRC-2.1.9,superseded,T13-004,,T13-004 replaces weekly intervals and their pause budgets with one net minute count per weekday and no pause budget.,13
+SRC-2.1.10,superseded,T13-017,,T13-017 replaces date availability exceptions with one time-off record per date carrying a minute count and a vacation or flex kind.,13
+SRC-2.1.11,superseded,T13-002,,"the configured timezone survives, while T13-002 removes the configurable 7-to-365 horizon and T13-053 fixes concrete allocation at fourteen days.",13
+SRC-2.1.12,superseded,T13-006,,"T13-006 turns the pause budget into the session's break reserve inside the day's window, and T13-038 bounds the today list by that capacity.",13
+SRC-2.1.17,superseded,T14-013,,"T14-013 makes the single active timer a set behind a concurrency setting that ships off, while the elapsed-time and historical-entry clauses survive.",14
+SRC-4.1,superseded,T13-004,,"T13-004 and T13-017 replace intervals, pause budgets, and availability exceptions with weekday minutes, a planned start, and per-date time off.",13
+SRC-4.2,superseded,T13-002,,"the horizon stops being a setting under T13-002 and T13-053, while the service mode, tray, and export parts of the story survive.",13
+SRC-4.17,superseded,T13-050,,T13-050 makes the month the unit and compares each past day's target against presence rather than planned against logged task time.,13
+SRC-RULE-TIME-1,superseded,T13-032,,"T13-032 replaces the single instant deadline with a sealed date-or-instant pair, while the timezone and local-date parts survive.",13
+SRC-RULE-VAL-1,superseded,T13-004,,"the interval, pause-budget, and exception-kind clauses retire with the timetable (T13-004, T13-017), while the title, priority, estimate, duration, date, and dependency clauses survive.",13
+SRC-RULE-CAP-1,superseded,T13-004,,T13-004 replaces the weekly intervals and their pause budgets with one net minute count per weekday and one window.,13
+SRC-RULE-CAP-2,superseded,T13-017,,T13-017 replaces date exceptions with one time-off record per date carrying a minute count and a kind.,13
+SRC-RULE-CAP-3,superseded,T13-003,,"T13-003 replaces the per-day expansion of intervals and exceptions with a weekly minute budget, a session per working day, per-date entries, and a monthly account.",13
+SRC-RULE-CAP-4,superseded,T13-005,,"T13-005 lets the observed start replace the configured one when the day begins, so today's window is start plus minutes plus the break reserve (T13-006).",13
+SRC-RULE-CAP-6,superseded,T13-002,,"T13-002 removes the 90-day default and the 7-to-365 setting, and T13-053 fixes concrete allocation at fourteen days.",13
+SRC-RULE-CAP-8,superseded,T13-006,,"the pause budget becomes the session's break reserve, counted inside the day's window (T13-006, T13-009).",13
+SRC-RULE-STATE-2,superseded,T14-013,,"T14-013 makes at most one task in progress conditional on a concurrency setting that ships off, and T14-014 allows an explicit concurrent start.",14
+SRC-RULE-OVERRIDE-2,superseded,T13-016,,"T13-016 lets the session take the place of the capacity override, so the overridable rules fall from three to two.",13
+SRC-RULE-OVERRIDE-5,superseded,T13-016,,"the capacity override is replaced by the session's leave time, which the user moves at any moment of the day (T13-011, T13-016).",13
+SRC-RULE-WARN-1,superseded,T13-046,,"T13-046 and T13-047 replace the warning list with the nine notices, renaming no_working_hours and plan_over_capacity, and T15-016 adds deadline_approaching as the tenth.",13
+SRC-RULE-WARN-3,superseded,T13-049,,"T13-049 retires the critical severity, so a notice carries only the info and warning levels (T15-028) and no critical-first ordering exists.",13
+SRC-RULE-RISK-5,superseded,T15-007,,"T15-007 settles the missed-against-unscheduled overlap in favour of missed, and T15-009 keeps blocked to the dependency graph.",15
+DEC-1,superseded,T14-001,,"settled by T14-001: the estimate is total effort, with remaining effort derived from it.",14
+DEC-2,superseded,T13-033,,settled by T13-033: a date-only deadline means before that local day ends.,13
+DEC-5,superseded,T13-054,,settled by T13-054: a projection continues past the fourteen allocated days by repeating the weekday pattern and is rough beyond four weeks.,13
+DEC-6,superseded,T15-007,,"settled by T15-007: missed takes precedence, and unscheduled covers only placement failures that are not deadline capacity.",15
+DEC-7,superseded,T15-012,,"settled by T15-012: six reasons, adding earlier_deadline and stable_order to the specification's four.",15
+DEC-8,superseded,T15-006,,"settled by T15-006: a notice carries a level of info or warning with its own OS-delivery flag, set per type with defaults (T15-029).",15
+DEC-12,superseded,T13-004,,"moot under T13-004, which replaces weekly intervals with one minute count and one window per weekday.",13
+DEC-13,superseded,T14-011,,"settled by T14-011: pausing stops the timer and keeps the task in progress, and T14-012 returns it to ready when another task starts.",14
+DEC-15,superseded,T15-009,,"settled by T15-009: blocked is the dependency graph only, and a task's own state makes it unscheduled (T15-010).",15
+DEC-16,superseded,T15-016,,"settled by T15-016: an effective deadline inside a configurable lead window, defaulting to twenty-four hours, with unfinished work in the closure.",15
+T02-014,superseded,T14-020,,"T14-020 refuses to infer the session from the first timer: starting work before the day is started fails, and the client offers to start the session in place (T14-021).",14

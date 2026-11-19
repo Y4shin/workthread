@@ -1,0 +1,234 @@
+id,status,target,effort,note,deciding_order
+T25-001,kept,,cli-basics,,25
+T25-002,kept,,cli-basics,,25
+T25-003,kept,,cli-basics,,25
+T25-004,kept,,cli-work-model,,25
+T25-005,kept,,cli-planning,,25
+T25-006,kept,,cli-basics,,25
+T25-007,kept,,cli-forecast,,25
+T25-008,kept,,cli-planning,,25
+T25-009,kept,,cli-review,,25
+T25-010,kept,,mcp-agent-interface,,25
+T25-011,kept,,cli-forecast,,25
+T25-012,kept,,cli-basics,,25
+T25-013,kept,,cli-basics,,25
+T25-014,kept,,cli-basics,,25
+T25-015,kept,,cli-basics,,25
+T25-016,kept,,cli-basics,,25
+T25-017,kept,,cli-basics,,25
+T25-018,kept,,cli-basics,,25
+T25-019,kept,,cli-basics,,25
+T25-020,kept,,cli-basics,,25
+T25-021,kept,,cli-basics,,25
+T25-022,kept,,cli-basics,,25
+T25-023,kept,,cli-basics,,25
+T25-024,kept,,cli-basics,,25
+T25-025,kept,,cli-basics,,25
+T25-026,kept,,cli-basics,,25
+T25-027,kept,,cli-basics,,25
+T25-028,kept,,cli-basics,,25
+T25-029,kept,,cli-basics,,25
+T25-030,kept,,cli-basics,,25
+T25-031,kept,,cli-forecast,,25
+T25-032,kept,,cli-forecast,,25
+T25-033,kept,,cli-forecast,,25
+T25-034,kept,,cli-basics,,25
+T25-035,kept,,cli-basics,,25
+T25-036,kept,,cli-basics,,25
+T25-037,kept,,cli-basics,,25
+T25-038,kept,,cli-basics,,25
+T25-040,kept,,planner-v1,,25
+T25-041,kept,,scaffolding,,25
+T25-042,kept,,cli-basics,,25
+T25-043,kept,,planner-v1,,25
+T25-039,deferred,,,deferred to v2: shell completion is cosmetic and would freeze the vocabulary before the capability efforts fill it in.,25
+T26-001,kept,,planner-v1,,26
+T26-002,kept,,planner-v1,,26
+T26-003,kept,,planner-v1,,26
+T26-004,kept,,planner-v1,,26
+T26-005,kept,,planner-v1,,26
+T26-007,kept,,planner-v1,,26
+T26-008,kept,,planner-v1,,26
+T26-009,kept,,planner-v1,,26
+T26-010,kept,,planner-v1,,26
+T26-013,kept,,planner-v1,,26
+T26-014,kept,,planner-v1,,26
+T26-015,kept,,planner-v1,,26
+T26-017,kept,,planner-v1,,26
+T26-018,kept,,planner-v1,,26
+T26-019,kept,,planner-v1,,26
+T26-020,kept,,planner-v1,,26
+T26-021,kept,,planner-v1,,26
+T26-022,kept,,planner-v1,,26
+T26-023,kept,,planner-v1,,26
+T26-024,kept,,planner-v1,,26
+T26-006,superseded,T27-011,,"T27-011 confines the column to kept rows and to the twelve settled efforts and T27-034 fixes it to the first effort that must satisfy the row, while the duty to name the owing effort survives.",27
+T26-011,superseded,T27-019,,"T27-019 keeps the effort requirement, confines it to the settled efforts and drops the ## Requirements map cross-check that T27-023 hands to to-tickets, and T27-037 lets planner-v1 own a row.",27
+T26-012,superseded,T27-038,,"T27-038 restates rule 4 with the covered-twice failure and T27-037 exempts the rows owned by planner-v1 from it, while the Covers: line under every section survives.",27
+T26-016,superseded,T27-020,,"T27-020 keeps rule 4 as to-spec's gate and leaves the effort rule to the build-time self-check, because T27-019 drops the ## Requirements cross-check that needed the specification.",27
+T27-004,kept,,planner-v1,,27
+T27-005,kept,,planner-v1,,27
+T27-006,kept,,planner-v1,,27
+T27-007,kept,,planner-v1,,27
+T27-008,kept,,planner-v1,,27
+T27-011,kept,,planner-v1,,27
+T27-014,kept,,planner-v1,,27
+T27-015,kept,,planner-v1,,27
+T27-016,kept,,planner-v1,,27
+T27-019,kept,,planner-v1,,27
+T27-020,kept,,planner-v1,,27
+T27-021,kept,,planner-v1,,27
+T27-025,kept,,planner-v1,,27
+T27-026,kept,,planner-v1,,27
+T27-027,kept,,planner-v1,,27
+T27-028,kept,,planner-v1,,27
+T27-029,kept,,planner-v1,,27
+T27-030,kept,,planner-v1,,27
+T27-031,kept,,planner-v1,,27
+T27-032,kept,,planner-v1,,27
+T27-033,kept,,planner-v1,,27
+T27-034,kept,,planner-v1,,27
+T27-035,kept,,planner-v1,,27
+T27-036,kept,,planner-v1,,27
+T27-037,kept,,planner-v1,,27
+T27-038,kept,,planner-v1,,27
+T27-001,duplicate,T26-002,,"it restates the produced file, its one row per source item and its fixed header, which T26-001 and T26-002 settle.",26
+T27-002,duplicate,T26-002,,it repeats the fixed header string that T26-002 settles verbatim.,26
+T27-003,duplicate,T26-001,,it repeats the location outside docs/tasks/ and both reasons that T26-001 already gives.,26
+T27-009,duplicate,T26-004,,it repeats the five dispositions that T26-004 settles.,26
+T27-010,duplicate,T26-005,,"it repeats when the target column is filled, as T26-005 settles, and adds only that it is empty otherwise.",26
+T27-012,duplicate,T26-007,,"it repeats what the spec column means and adds that to-spec fills it later, which T26-017 already schedules.",26
+T27-013,duplicate,T26-008,,it repeats the note rule for refused and deferred rows that T26-008 settles.,26
+T27-017,duplicate,T26-009,,"it repeats rule 1, that no identifier appears twice, which T26-009 settles.",26
+T27-018,duplicate,T26-010,,"it repeats rule 2, that every superseded and duplicate target exists, which T26-010 settles.",26
+T27-022,duplicate,T26-017,,"it repeats to-spec's gate of walking the directory, writing a Covers: line per section and not publishing until the check passes, which T26-017 settles.",26
+T27-023,duplicate,T26-021,,it repeats the ## Requirements section taken from the effort column that T26-021 settles.,26
+T27-024,duplicate,T26-022,,"it repeats that each child checks its own list at its close, as T26-022 settles.",26
+MAP-001,kept,,cli-basics,,28
+MAP-002,kept,,planner-v1,,28
+MAP-003,kept,,planner-v1,,28
+MAP-004,kept,,planner-v1,,28
+MAP-005,kept,,planner-v1,,28
+MAP-006,kept,,planner-v1,,28
+MAP-007,kept,,scaffolding,,28
+MAP-008,kept,,planner-v1,,28
+MAP-009,kept,,planner-v1,,28
+MAP-010,kept,,cli-planning,,28
+MAP-011,superseded,MAP-040,,"MAP-040 keeps the fourteen days as concrete allocation only and continues projections past it, marked rough beyond four weeks, so ordering still protects deadlines but the two-week ceiling does not survive.",28
+MAP-012,kept,,planner-v1,,28
+MAP-013,kept,,cli-basics,,28
+MAP-014,kept,,scaffolding,,28
+MAP-015,kept,,planner-v1,,28
+MAP-016,kept,,scaffolding,,28
+MAP-017,kept,,tray-surface,,28
+MAP-018,kept,,client-shell,,28
+MAP-019,kept,,scaffolding,,28
+MAP-020,kept,,cli-planning,,28
+MAP-021,kept,,mcp-agent-interface,,28
+MAP-022,kept,,cli-basics,,28
+MAP-023,kept,,planner-v1,,28
+MAP-024,kept,,daemon-api,,28
+MAP-025,kept,,scaffolding,,28
+MAP-026,kept,,scaffolding,,28
+MAP-027,kept,,scaffolding,,28
+MAP-028,kept,,cli-basics,,28
+MAP-029,kept,,scaffolding,,28
+MAP-030,kept,,daemon-api,,28
+MAP-031,kept,,work-store,,28
+MAP-032,kept,,work-store,,28
+MAP-033,kept,,work-store,,28
+MAP-034,deferred,,,"deferred to v2: date gating and then recurrence are the two named changes immediately after v1, and no pre-v1 release carries them.",28
+MAP-035,kept,,cli-planning,,28
+MAP-036,kept,,cli-planning,,28
+MAP-037,kept,,cli-planning,,28
+MAP-038,kept,,cli-planning,,28
+MAP-039,kept,,cli-planning,,28
+MAP-040,kept,,cli-planning,,28
+MAP-041,superseded,MAP-049,,"MAP-049 raises the count to ten notice types with deadline_approaching, so the one notice concept, its info or warning level, its OS delivery flag, its dismissal on ForPlanningQueries and the retirement of critical survive.",28
+MAP-042,kept,,cli-work-model,,28
+MAP-043,kept,,cli-work-model,,28
+MAP-044,kept,,cli-planning,,28
+MAP-045,kept,,cli-basics,,28
+MAP-046,kept,,cli-basics,,28
+MAP-047,kept,,cli-forecast,,28
+MAP-048,kept,,cli-planning,,28
+MAP-049,kept,,cli-forecast,,28
+MAP-050,kept,,cli-forecast,,28
+MAP-051,kept,,cli-work-model,,28
+MAP-052,kept,,mcp-agent-interface,,28
+MAP-053,kept,,cli-forecast,,28
+MAP-054,kept,,mcp-agent-interface,,28
+MAP-055,kept,,cli-work-model,,28
+MAP-056,kept,,cli-work-model,,28
+MAP-057,kept,,cli-review,,28
+MAP-058,kept,,cli-review,,28
+MAP-059,kept,,work-store,,28
+MAP-060,kept,,daemon-api,,28
+MAP-061,kept,,daemon-api,,28
+MAP-062,kept,,daemon-api,,28
+MAP-063,kept,,daemon-api,,28
+MAP-064,kept,,daemon-api,,28
+MAP-065,kept,,daemon-api,,28
+MAP-066,kept,,daemon-api,,28
+MAP-067,kept,,daemon-api,,28
+MAP-068,kept,,planner-v1,,28
+MAP-069,kept,,client-shell,,28
+MAP-C01,kept,,planner-v1,,28
+MAP-C02,kept,,planner-v1,,28
+MAP-C03,kept,,planner-v1,,28
+MAP-C04,kept,,scaffolding,,28
+MAP-C05,kept,,planner-v1,,28
+MAP-C06,kept,,planner-v1,,28
+MAP-C07,kept,,scaffolding,,28
+MAP-C08,kept,,cli-basics,,28
+MAP-C09,kept,,planner-v1,,28
+MAP-C10,kept,,planner-v1,,28
+MAP-C11,kept,,planner-v1,,28
+MAP-C12,kept,,planner-v1,,28
+MAP-C13,kept,,client-shell,,28
+MAP-C14,kept,,cli-basics,,28
+CTX-daemon,kept,,daemon-api,,29
+CTX-client,kept,,client-shell,,29
+CTX-standalone-mode,kept,,cli-basics,,29
+CTX-split-mode,kept,,daemon-api,,29
+CTX-note,kept,,work-store,,29
+CTX-core,refused,,,"refused because it describes the code rather than the product, per T27-005 and T27-032, and it is recorded as architecture vocabulary in architecture.md.",29
+CTX-surface,refused,,,"refused because it describes the code rather than the product, per T27-005 and T27-032, and it is recorded as architecture vocabulary in architecture.md.",29
+CTX-surface-port,refused,,,"refused because it describes the code rather than the product, per T27-005 and T27-032, and it is recorded as architecture vocabulary in architecture.md.",29
+CTX-infrastructure-port,refused,,,"refused because it describes the code rather than the product, per T27-005 and T27-032, and it is recorded as architecture vocabulary in architecture.md.",29
+CTX-adapter,refused,,,"refused because it describes the code rather than the product, per T27-005 and T27-032, and it is recorded as architecture vocabulary in architecture.md.",29
+CTX-remote-proxy,refused,,,"refused because it describes the code rather than the product, per T27-005 and T27-032, and it is recorded as architecture vocabulary in architecture.md.",29
+CTX-timetable,kept,,cli-planning,,29
+CTX-planned-start,kept,,cli-planning,,29
+CTX-session,kept,,cli-planning,,29
+CTX-leave-time,kept,,cli-planning,,29
+CTX-stop-time,kept,,cli-planning,,29
+CTX-break-reserve,kept,,cli-planning,,29
+CTX-target,kept,,cli-planning,,29
+CTX-balance,kept,,cli-planning,,29
+CTX-presence,kept,,cli-review,,29
+CTX-vacation,kept,,cli-planning,,29
+CTX-flex,kept,,cli-planning,,29
+CTX-reconciliation,kept,,cli-planning,,29
+CTX-notice,kept,,cli-forecast,,29
+CTX-estimate,kept,,cli-work-model,,29
+CTX-remaining-effort,kept,,cli-work-model,,29
+CTX-completion-slot,kept,,cli-planning,,29
+CTX-concurrent-work,kept,,cli-basics,,29
+CTX-forecast,kept,,cli-forecast,,29
+CTX-slack,kept,,cli-forecast,,29
+CTX-risk,kept,,cli-forecast,,29
+CTX-cursor,kept,,mcp-agent-interface,,29
+CTX-pending-operation,kept,,mcp-agent-interface,,29
+CTX-change-feed,kept,,mcp-agent-interface,,29
+CTX-event-stream,kept,,daemon-api,,29
+CTX-export,kept,,cli-review,,29
+CTX-backup,kept,,cli-review,,29
+CTX-purge,kept,,cli-review,,29
+SRC-2.1.8,superseded,MAP-036,,"MAP-036 lets the session absorb the capacity override, so dependency order and system-owned order are the two overridable rules left, while the explicit, confirmed, recorded override survives.",28
+SRC-2.1.16,superseded,MAP-049,,"MAP-049 replaces the critical category with an info or warning level and a per-type OS delivery setting, so OS notifications, the approaching-deadline trigger and user control survive.",28
+SRC-RULE-EFFORT-1,superseded,MAP-043,,"MAP-043 drops the max(...,0) clamp so remaining effort is the total minus logged minutes and may go negative, while the logged-minutes formula and the rule that only logged work changes remaining effort survive.",28
+SRC-RULE-NOTIF-1,superseded,MAP-049,,"MAP-049 makes each notice type's level and OS delivery a setting with a default instead of an opt-in category, and retires the critical category with the critical severity, while user control over delivery survives.",28
+SRC-RULE-STATE-6,superseded,MAP-055,,"MAP-055 keeps deletion off request and adds a configurable purge age, off by default, that permanently deletes cancelled and archived records older than it, so the ban on on-request deletion and the deletable time entries survive.",28
+T02-010,superseded,MAP-040,,"MAP-040 holds concrete allocation to fourteen days and continues projections past it, marked rough beyond four weeks, so the short horizon survives only as the concrete allocation.",28
+T13-046,superseded,MAP-049,,"MAP-049 adds the tenth notice type, deadline_approaching, so the nine types listed here and their levels survive and the count they state does not.",28
