@@ -2,6 +2,7 @@
 type: map
 title: "Planner v1: decompose the specification, own architecture and product decisions"
 status: stable
+ready_for_spec: true
 ---
 # Planner v1: decompose the specification, own architecture and product decisions
 

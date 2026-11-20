@@ -72,3 +72,16 @@ tasks (46).
 The catalogue records what the record says and who owes it. It does not prove
 that a later row contradicts an earlier kept row; that is a semantic judgement,
 and the guard is the fidelity sample plus the specification's adversarial read.
+
+## A citation decayed, and the checker caught half of it
+
+`tw_finalize_map` added one line to the map's frontmatter, which moved every
+line number in the map down by one. All eighty-three map rows then cited the
+wrong line. The checker noticed only the two that landed on a blank line, so the
+other eighty-one were silently off by one until they were found. Every map row
+was re-anchored and the parts, the catalogue and the directory were corrected
+together.
+
+The lesson is that a line citation is only true while its source stands still.
+The sources were frozen before extraction for exactly this reason, and the one
+file the workflow tools still write is the one that moved.

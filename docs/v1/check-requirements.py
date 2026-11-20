@@ -116,7 +116,14 @@ def read_covers(spec: Path) -> dict[str, list[str]]:
         match = COVERS.match(line)
         if match:
             parts = [p.strip().strip("`") for p in re.split(r"[,\s]+", match.group(1))]
-            covers.setdefault(section, []).extend([p for p in parts if p])
+            for part in parts:
+                if not part:
+                    continue
+                if ".." in part:
+                    start, _, end = part.partition("..")
+                    covers.setdefault(section, []).append("range:" + start + ".." + end)
+                else:
+                    covers.setdefault(section, []).append(part)
     return covers
 
 
@@ -274,6 +281,24 @@ def check_spec(spec: Path, rows: list[dict[str, str]], problems: list[str]) -> N
     covers = read_covers(spec)
     cited: dict[str, list[str]] = defaultdict(list)
     known = {row["id"]: row for row in rows}
+    order = [row["id"] for row in rows]
+    position = {ident: index for index, ident in enumerate(order)}
+    kept_ids = {row["id"] for row in rows if row["status"] == "kept"} if "status" in rows[0] else set()
+    expanded: dict[str, list[str]] = {}
+    for section, entries in covers.items():
+        bucket = expanded.setdefault(section, [])
+        for entry in entries:
+            if not entry.startswith("range:"):
+                bucket.append(entry)
+                continue
+            start, _, end = entry[len("range:"):].partition("..")
+            if start not in position or end not in position:
+                bucket.append(start)
+                bucket.append(end)
+                continue
+            low, high = sorted((position[start], position[end]))
+            bucket.extend(ident for ident in order[low:high + 1] if ident in kept_ids)
+    covers = expanded
     for section, ids in covers.items():
         for ident in ids:
             cited[ident].append(section)
