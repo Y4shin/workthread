@@ -22,6 +22,12 @@ lands in twelve child efforts rather than in tickets here. So the contracts
 below are per child effort, not per ticket, and each one names the requirement
 ranges it owes from `docs/v1/requirements-directory.csv`.
 
+Start here if you are picking up one child: the build order, with each effort's
+predecessor, release, and requirement count, is the table under
+[`## Effort order`](#effort-order). Then read that effort's contract under
+`## Contracts per child effort`, which states what it exports and what it must
+not change.
+
 ## The build and the module graph
 
 Java 21 LTS, pinned by toolchain. Gradle 9.9.1 with the Kotlin DSL and
@@ -631,3 +637,45 @@ obligation behind thirty met ones, and because the rows are the only statement
 of what the effort was for. Each child's map carries the same list and the same
 rule under its `## Requirements` section, so the obligation travels with the
 effort rather than living only in this document.
+
+## Effort order
+
+The twelve child efforts, in the order they must be built. `blocked_by` names
+the effort whose hand-off the next one needs, so position alone is never the
+rule: read the edge.
+
+| # | Effort | Blocked by | Release | Kept requirements |
+|---|---|---|---|---|
+| 1 | `scaffolding` | none | 0.1 | 73 |
+| 2 | `work-store` | `scaffolding` | 0.1 | 61 |
+| 3 | `cli-basics` | `work-store` | 0.1 | 75 |
+| 4 | `cli-work-model` | `cli-basics` | 0.2 | 53 |
+| 5 | `cli-planning` | `cli-work-model` | 0.3 | 129 |
+| 6 | `cli-forecast` | `cli-planning` | 0.4 | 94 |
+| 7 | `cli-review` | `cli-forecast` | 0.5 | 34 |
+| 8 | `mcp-agent-interface` | `cli-review` | 0.6 | 53 |
+| 9 | `daemon-api` | `mcp-agent-interface` | 0.7 | 73 |
+| 10 | `client-shell` | `daemon-api` | 0.8 | 22 |
+| 11 | `client-views` | `client-shell` | 0.8 | 2 |
+| 12 | `tray-surface` | `client-views` | 0.9 | 18 |
+
+Three facts this table carries, so no reader has to reconstruct them:
+
+- **The graph is one chain**, not a tree. Every effort has exactly one
+  predecessor and at most one successor, so no two efforts are siblings that
+  could proceed in parallel. That is a property of this design, not a rule; if a
+  later change makes two efforts independent, the table says so and the numbering
+  stops implying order.
+- **Release does not order efforts.** 0.1 holds three, 0.8 holds two. The
+  release is what a user can do with the result; the chain is what the code
+  needs.
+- **`blocked_by` here means hand-off, not a ticket edge.** Child efforts are
+  linked by `origin_effort` on their own maps, never by `blocked_by` between
+  efforts. This table is documentation of the build order, and the map's
+  `## Child efforts` section remains the authoritative source for the same
+  edges.
+
+Each child's map must carry its own row when it is created: position,
+predecessor, release, and the requirement ranges from its contract below. That
+is what lets an agent start on one child with no access to this effort's
+conversation, and it is why the order is recorded here rather than assumed.
