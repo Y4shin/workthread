@@ -644,22 +644,27 @@ The twelve child efforts, in the order they must be built. `blocked_by` names
 the effort whose hand-off the next one needs, so position alone is never the
 rule: read the edge.
 
-| # | Effort | Blocked by | Release | Kept requirements |
-|---|---|---|---|---|
-| 1 | `scaffolding` | none | 0.1 | 73 |
-| 2 | `work-store` | `scaffolding` | 0.1 | 61 |
-| 3 | `cli-basics` | `work-store` | 0.1 | 75 |
-| 4 | `cli-work-model` | `cli-basics` | 0.2 | 53 |
-| 5 | `cli-planning` | `cli-work-model` | 0.3 | 129 |
-| 6 | `cli-forecast` | `cli-planning` | 0.4 | 94 |
-| 7 | `cli-review` | `cli-forecast` | 0.5 | 34 |
-| 8 | `mcp-agent-interface` | `cli-review` | 0.6 | 53 |
-| 9 | `daemon-api` | `mcp-agent-interface` | 0.7 | 73 |
-| 10 | `client-shell` | `daemon-api` | 0.8 | 22 |
-| 11 | `client-views` | `client-shell` | 0.8 | 2 |
-| 12 | `tray-surface` | `client-views` | 0.9 | 18 |
+The slug carries the position, so the order is visible in a directory listing
+and in a command, without opening this document. The number in the slug is
+permanent: an effort inserted between two of these later takes a suffixed slug
+rather than renumbering the ones after it.
 
-Three facts this table carries, so no reader has to reconstruct them:
+| # | Effort slug | Section in the map | Blocked by | Release | Kept requirements |
+|---|---|---|---|---|---|
+| 1 | `01-scaffolding` | 1 | none | 0.1 | 73 |
+| 2 | `02-work-store` | 2 | `01-scaffolding` | 0.1 | 61 |
+| 3 | `03-cli-basics` | 3 | `02-work-store` | 0.1 | 75 |
+| 4 | `04-cli-work-model` | 4 | `03-cli-basics` | 0.2 | 53 |
+| 5 | `05-cli-planning` | 5 | `04-cli-work-model` | 0.3 | 129 |
+| 6 | `06-cli-forecast` | 6 | `05-cli-planning` | 0.4 | 94 |
+| 7 | `07-cli-review` | 7 | `06-cli-forecast` | 0.5 | 34 |
+| 8 | `08-mcp-agent-interface` | 8 | `07-cli-review` | 0.6 | 53 |
+| 9 | `09-daemon-api` | 9 | `08-mcp-agent-interface` | 0.7 | 73 |
+| 10 | `10-client-shell` | 10 | `09-daemon-api` | 0.8 | 22 |
+| 11 | `11-client-views` | 11 | `10-client-shell` | 0.8 | 2 |
+| 12 | `12-tray-surface` | 12 | `11-client-views` | 0.9 | 18 |
+
+Four facts this table carries, so no reader has to reconstruct them:
 
 - **The graph is one chain**, not a tree. Every effort has exactly one
   predecessor and at most one successor, so no two efforts are siblings that
@@ -674,8 +679,12 @@ Three facts this table carries, so no reader has to reconstruct them:
   efforts. This table is documentation of the build order, and the map's
   `## Child efforts` section remains the authoritative source for the same
   edges.
+- **The map and the closing ticket use the bare names.** They are the planning
+  record as it was written, and they are not rewritten. `3. cli-basics` in the
+  map and `03-cli-basics` here are the same effort, and the `## Section in the
+  map` column is the translation.
 
-Each child's map must carry its own row when it is created: position,
+Each child's map must carry its own row when it is created: slug, position,
 predecessor, release, and the requirement ranges from its contract below. That
 is what lets an agent start on one child with no access to this effort's
 conversation, and it is why the order is recorded here rather than assumed.

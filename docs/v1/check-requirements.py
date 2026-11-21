@@ -70,18 +70,18 @@ POINTING = {"superseded", "duplicate"}
 NEEDS_NOTE = {"superseded", "duplicate", "refused", "deferred"}
 UNIT_ORDERS = set(range(30))
 CHILD_EFFORTS = {
-    "scaffolding",
-    "work-store",
-    "cli-basics",
-    "cli-work-model",
-    "cli-planning",
-    "cli-forecast",
-    "cli-review",
-    "mcp-agent-interface",
-    "daemon-api",
-    "client-shell",
-    "client-views",
-    "tray-surface",
+    "01-scaffolding",
+    "02-work-store",
+    "03-cli-basics",
+    "04-cli-work-model",
+    "05-cli-planning",
+    "06-cli-forecast",
+    "07-cli-review",
+    "08-mcp-agent-interface",
+    "09-daemon-api",
+    "10-client-shell",
+    "11-client-views",
+    "12-tray-surface",
 }
 SELF_OWNER = "planner-v1"
 COVERS = re.compile(r"^\s*Covers:\s*(.+)$", re.IGNORECASE)
