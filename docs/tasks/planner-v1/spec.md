@@ -1,7 +1,7 @@
 ---
 type: spec
 title: "workthread: a single-user task and time planner, v1"
-status: draft
+status: stable
 ---
 
 ## Problem Statement
@@ -984,3 +984,5 @@ headlessly. Java 21 caps the usable JavaFX line at 23.0.2. Server-sent events in
 the OpenAPI document depend on the documentation generator's line, which is why
 `itemSchema` waits for OpenAPI 3.2 output. Image size and cold start were
 measured on this project rather than assumed.
+
+> The architecture content in this specification is archival: the living architecture document is [architecture.md](architecture.md); update it there, not here.
