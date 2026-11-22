@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Enforce the dependency rules in the build
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - declared-stack
 size: m
