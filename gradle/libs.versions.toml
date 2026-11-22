@@ -4,9 +4,15 @@
 [versions]
 junit = "5.14.4"
 assertj = "3.27.7"
+javafx = "21.0.13"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+
+[plugins]
+# The JavaFX plugin owns the JavaFX coordinates and the host's platform
+# classifier; the client never declares a JavaFX jar by hand.
+javafx = { id = "org.openjfx.javafxplugin", version = "0.1.0" }
