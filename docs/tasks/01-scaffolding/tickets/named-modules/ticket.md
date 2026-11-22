@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Make the seven modules named Java modules
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - declared-stack
 size: m
