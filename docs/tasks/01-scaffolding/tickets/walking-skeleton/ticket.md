@@ -26,3 +26,11 @@ A clean checkout builds with the committed Gradle 9.9.1 wrapper on Java 21. The 
 ## Blocked by
 
 None (can start immediately).
+
+## Implementation notes
+
+Each module's main package is declared by a javadoc-only `package-info.java`; no type and no product API were invented, so every 0.1 jar carries only its manifest. One test per module asserts its own package name against the architecture's literal, because there is no product behaviour to assert yet.
+
+Edges use `api(project(":contract"))` from `core`, `adapters`, and `wiring`, and `implementation(...)` from `cli`, `mcp`, `api`, and `client`: the architecture's table names the edges, not the configurations. The version catalogue is read once at script level in the root build, because the `libs` accessor does not resolve inside a `subprojects { }` block. The wrapper was generated in a scratch directory and copied in, because Gradle 9.9.1 refuses to run the `wrapper` task in a directory with no settings file.
+
+`.gitignore` had to un-ignore `gradle/wrapper/gradle-wrapper.jar`, because the existing `*.jar` rule would have dropped it and broken a clean checkout. `gradle.properties` also fixes `group=io.github.y4shin.workthread`, co-located with the single version source. A module descriptor cannot export a package that holds no type (`javac` rejects it with "package is empty or does not exist"), which constrains the `named-modules` ticket: its descriptors need a first type per exported package.
