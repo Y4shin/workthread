@@ -6,6 +6,15 @@ title: Task Changelog
 # Task Changelog
 
 
+
+## 2026-11-22, Enforce the dependency rules in the build (dependency-checks)
+
+The build now refuses a dependency that leaves the architecture's edge table, Spring or JavaFX in `core`, and a JavaFX artifact on any runtime classpath other than the client's. Each refusal names the module, the dependency, and the allowed row.
+
+Decisions: the runtime classpath rule exempts `client`, because the declared stack puts JavaFX there and the literal rule would fail the real build; the edge rule judges project dependencies only, since `adapters`, `mcp`, `api`, and `client` legitimately declare libraries; the client's exemption is recorded in the architecture, not just in the build.
+
+Outcome: seven fixtures prove the refusals, the fixture task rides `./gradlew check`, and `./gradlew clean build` stays green with 58 executed tasks and the configuration cache reused. Test scope is not covered: a forbidden edge declared as `testImplementation` still passes.
+
 ## 2026-11-22, Declare the real stack and prove it resolves (declared-stack)
 
 Every module now declares its real dependency set at the pinned versions, and the whole set resolves: JavaFX 21.0.13 in `client` through the JavaFX plugin with the host classifier, Spring Boot 4.2.0 in `api` as a platform plus one versionless starter, the MCP SDK 2.1.0 aggregator with an explicit Jackson mapper in `mcp`, sqlite-jdbc 3.54.1.0 in `adapters`, JUnit 5.14.4 and AssertJ 3.27.7 everywhere.
