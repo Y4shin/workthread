@@ -14,3 +14,6 @@ bin/
 .idea/
 .vscode/
 *.iml
+
+# The Gradle wrapper jar is committed, so the wrapper runs from a clean checkout
+!gradle/wrapper/gradle-wrapper.jar
