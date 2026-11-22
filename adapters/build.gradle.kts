@@ -1,7 +1,7 @@
 dependencies {
     api(project(":contract"))
 
-    // The store driver. Its version is pinned here rather than left to any
-    // platform, because the Spring Boot BOM would move it back.
+    // The store driver, pinned so no platform can move it: Spring Boot's BOM
+    // manages the older 3.53.4.0.
     implementation(libs.sqliteJdbc)
 }
