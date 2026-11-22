@@ -35,6 +35,8 @@ No surface module depends on another surface module. A new module requires an ar
 
 `contract`, `core`, `adapters`, `wiring`, `cli`, `mcp`, and `client` carry `module-info.java` and are named modules. `api` has no descriptor and runs on the classpath, because Spring Boot's classpath model fights named modules. The package root is `io.github.y4shin.workthread`, one subpackage per module.
 
+A module descriptor cannot export a package that holds no type, and at this point in the effort no module holds one. Each of the seven named modules therefore carries one placeholder type in its package, so its descriptor can export the package. The placeholder is the module's only type until the effort that owns the module adds real ones: that effort replaces the placeholder instead of deleting it, which keeps `contract`'s API snapshot honest. Adding a second type to a module's exported package needs no new decision.
+
 ## The declared stack
 
 JavaFX 21.0.13 in `client`, through the JavaFX Gradle plugin 0.1.0, which supplies the host's platform classifier. Spring Boot 4.2.0 in `api`, brought in with the dependency platform only: no Spring Boot plugin and no dependency-management plugin, because the BOM alone is enough and the management plugin would override the store driver version. The MCP SDK 2.1.0 aggregator in `mcp`, with the JSON mapper supplied explicitly. sqlite-jdbc 3.54.1.0 in `adapters`. JUnit 5.14.4 and AssertJ 3.27.7 for tests. `org.beryx.jlink` 4.2.0 for packaging.
