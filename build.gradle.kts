@@ -58,6 +58,11 @@ val moduleEdgeRows: Map<String, List<String>> = mapOf(
     "client" to listOf("contract", "wiring"),
 )
 
+// The declared stack puts JavaFX in the client alone. The runtime only warns
+// when JavaFX sits on the classpath, so the build refuses a JavaFX artifact
+// everywhere else.
+val moduleRowsCarryingJavaFx: Set<String> = setOf("client")
+
 subprojects {
     apply(plugin = "java-library")
 
@@ -92,6 +97,19 @@ subprojects {
         resolvedJars.from(configurations.named("testRuntimeClasspath"))
         report.set(layout.buildDirectory.file("reports/declared-stack/module-names.tsv"))
     }
+
+    // The runtime classpath check: a JavaFX artifact on the classpath instead of
+    // the module path is a leak the runtime only warns about, so the build
+    // refuses it.
+    tasks.register<VerifyNoJavaFxOnRuntimeClasspath>("verifyNoJavaFxOnRuntimeClasspath") {
+        group = "verification"
+        description = "Refuses a JavaFX artifact on a runtime classpath the declared stack does not allow one on."
+        moduleName.set(project.name)
+        configurationName.set("runtimeClasspath")
+        mayCarryJavaFx.set(project.name in moduleRowsCarryingJavaFx)
+        runtimeClasspath.from(configurations.named("runtimeClasspath"))
+    }
+    tasks.named("check") { dependsOn("verifyNoJavaFxOnRuntimeClasspath") }
 
     // The edge row this module obeys. A module with no row is not part of the
     // architecture, so no row can allow its dependencies and the build stops
@@ -399,12 +417,131 @@ tasks.register("verifyDependencyRuleFixtures") {
     group = "verification"
     description = "Proves each dependency rule refuses a declared violation with a message that names it."
     doLast {
-        val problems = dependencyRuleFixtureProblems()
+        val problems = dependencyRuleFixtureProblems() + runtimeClasspathFixtureProblems()
         if (problems.isNotEmpty()) {
             throw GradleException(
                 "The dependency rule fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
             )
         }
-        println("${moduleDependencyFixtures.size} dependency rule fixtures held")
+        println("${moduleDependencyFixtures.size + runtimeClasspathFixtures.size} dependency rule fixtures held")
     }
+}
+
+/**
+ * A JavaFX artifact on a runtime classpath the module does not own, or the
+ * refusal it must produce.
+ */
+class RuntimeClasspathFixture(
+    val what: String,
+    val module: String,
+    val configuration: String,
+    val artifacts: List<String>,
+    val mayCarryJavaFx: Boolean,
+    val expectedRefusal: String?,
+)
+
+// The runtime classpath rule has to refuse JavaFX wherever the client's stack
+// leaks, and accept it in the client, or the real build would fail on its own
+// declared stack.
+val runtimeClasspathFixtures = listOf(
+    RuntimeClasspathFixture(
+        what = "the adapters carry JavaFX",
+        module = "adapters",
+        configuration = "runtimeClasspath",
+        artifacts = listOf("sqlite-jdbc-3.54.1.0.jar", "javafx-controls-21.0.13-linux.jar"),
+        mayCarryJavaFx = false,
+        expectedRefusal = "adapters:runtimeClasspath carries javafx-controls-21.0.13-linux.jar; JavaFX belongs to the client module alone",
+    ),
+    RuntimeClasspathFixture(
+        what = "the client carries JavaFX",
+        module = "client",
+        configuration = "runtimeClasspath",
+        artifacts = listOf("javafx-controls-21.0.13-linux.jar"),
+        mayCarryJavaFx = true,
+        expectedRefusal = null,
+    ),
+)
+
+/**
+ * The runtime classpath rule: JavaFX is allowed on the client's classpath and
+ * on no other module's, and the refusal names the configuration and the
+ * artifact so a reader knows where it came from.
+ */
+class RuntimeClasspathRule(
+    private val module: String,
+    private val configuration: String,
+    private val artifacts: List<String>,
+    private val mayCarryJavaFx: Boolean,
+) : DependencyRule() {
+
+    override fun violations(): List<String> {
+        if (mayCarryJavaFx) {
+            return listOf()
+        }
+        return artifacts
+            .filter { artifact -> artifact.startsWith(JAVA_FX_PREFIX) }
+            .distinct()
+            .sorted()
+            .map { artifact -> "$module:$configuration carries $artifact; JavaFX belongs to the client module alone" }
+    }
+
+    private companion object {
+        const val JAVA_FX_PREFIX = "javafx-"
+    }
+}
+
+/**
+ * One module's resolved runtime classpath, refused when a JavaFX artifact
+ * appears on it. The classpath is read after resolution, not from the declared
+ * coordinates: JavaFX reaches a classpath through a transitive dependency as
+ * easily as directly.
+ */
+abstract class VerifyNoJavaFxOnRuntimeClasspath : DefaultTask() {
+
+    @get:Input
+    abstract val moduleName: Property<String>
+
+    @get:Input
+    abstract val configurationName: Property<String>
+
+    @get:Input
+    abstract val mayCarryJavaFx: Property<Boolean>
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val runtimeClasspath: ConfigurableFileCollection
+
+    @TaskAction
+    fun verifyResolvedClasspath() {
+        RuntimeClasspathRule(
+            module = moduleName.get(),
+            configuration = configurationName.get(),
+            artifacts = runtimeClasspath.files.map { jar -> jar.name },
+            mayCarryJavaFx = mayCarryJavaFx.get(),
+        ).verify()
+    }
+}
+
+fun runtimeClasspathFixtureProblems(): List<String> {
+    val problems = mutableListOf<String>()
+    runtimeClasspathFixtures.forEach { fixture ->
+        val refusal = refusalOf(
+            RuntimeClasspathRule(
+                module = fixture.module,
+                configuration = fixture.configuration,
+                artifacts = fixture.artifacts,
+                mayCarryJavaFx = fixture.mayCarryJavaFx,
+            ),
+        )
+        val expected = fixture.expectedRefusal
+        when {
+            expected == null && refusal != null ->
+                problems.add("Fixture '${fixture.what}' was refused, and it must be accepted: $refusal")
+            expected != null && refusal == null ->
+                problems.add("Fixture '${fixture.what}' was accepted, and it must be refused with: $expected")
+            expected != null && refusal != null && !refusal.contains(expected) ->
+                problems.add("Fixture '${fixture.what}' was refused with '$refusal', and the refusal must carry: $expected")
+        }
+    }
+    return problems
 }
