@@ -4,7 +4,9 @@
 
 import java.io.File
 import java.lang.module.ModuleFinder
+import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.artifacts.VersionCatalogsExtension
+import org.gradle.api.attributes.Category
 
 plugins {
     base
@@ -41,6 +43,21 @@ val pinnedJarArtifactNames = listOf(
     "assertj-core",
 )
 
+// The architecture's "May depend on" table, one row per module. This is the
+// build's copy of the table, and the dependency check's only source for what a
+// module may reach: a module with no row is not part of the architecture, so it
+// cannot be checked at all.
+val moduleEdgeRows: Map<String, List<String>> = mapOf(
+    "contract" to listOf(),
+    "core" to listOf("contract"),
+    "adapters" to listOf("contract"),
+    "wiring" to listOf("contract"),
+    "cli" to listOf("contract", "wiring"),
+    "mcp" to listOf("contract", "wiring"),
+    "api" to listOf("contract", "wiring"),
+    "client" to listOf("contract", "wiring"),
+)
+
 subprojects {
     apply(plugin = "java-library")
 
@@ -74,6 +91,33 @@ subprojects {
         artifactNames.set(pinnedJarArtifactNames)
         resolvedJars.from(configurations.named("testRuntimeClasspath"))
         report.set(layout.buildDirectory.file("reports/declared-stack/module-names.tsv"))
+    }
+
+    // The edge row this module obeys. A module with no row is not part of the
+    // architecture, so no row can allow its dependencies and the build stops
+    // instead of checking it against nothing.
+    val edgeRow = moduleEdgeRows[name]
+        ?: error("Module ':${name}' has no row in the architecture's edge table; a new module requires an architecture change first.")
+
+    afterEvaluate {
+        val module = name
+        val mainSourceSet = extensions.getByType<SourceSetContainer>().named("main").get()
+        val declared = listOf(mainSourceSet.compileClasspathConfigurationName, mainSourceSet.runtimeClasspathConfigurationName)
+            .flatMap { classpath -> configurations.getByName(classpath).hierarchy }
+            .flatMap { configuration -> configuration.dependencies }
+            .filterIsInstance<ProjectDependency>()
+            .map { dependency -> dependency.name }
+            .distinct()
+            .sorted()
+
+        tasks.register<VerifyModuleDependencies>("verifyModuleDependencies") {
+            group = "verification"
+            description = "Refuses a declared dependency the module's edge row does not allow."
+            moduleName.set(module)
+            allowedEdges.set(edgeRow)
+            moduleDependencies.set(declared)
+        }
+        tasks.named("check") { dependsOn("verifyModuleDependencies") }
     }
 }
 
@@ -136,5 +180,152 @@ tasks.register("printPinnedModuleNames") {
                 println(text)
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The dependency rules, and the fixtures that prove their refusals
+// ---------------------------------------------------------------------------
+
+/**
+ * A rule that names every violation it finds, then refuses the build. The
+ * message is part of the behaviour: it says which module, and what it declared,
+ * so a reader can fix the build without opening the rule.
+ */
+abstract class DependencyRule {
+
+    abstract fun violations(): List<String>
+
+    fun verify() {
+        val violations = violations()
+        if (violations.isNotEmpty()) {
+            throw GradleException(violations.joinToString(separator = "\n"))
+        }
+    }
+}
+
+/**
+ * The declared-dependency rule: a module reaches only the modules its edge row
+ * names.
+ */
+class ModuleDependencyRule(
+    private val module: String,
+    private val allowedEdges: List<String>,
+    private val moduleDependencies: List<String>,
+) : DependencyRule() {
+
+    override fun violations(): List<String> = moduleDependencies
+        .filterNot { dependency -> dependency in allowedEdges }
+        .map { dependency ->
+            "$module declares a dependency on $dependency, which its edge row does not allow; the row allows ${row()}"
+        }
+
+    private fun row(): String = if (allowedEdges.isEmpty()) "nothing" else allowedEdges.joinToString(separator = ", ")
+}
+
+/**
+ * One module's declared dependencies, checked against its edge row. The task
+ * reads the declarations the module's own build file made, across both
+ * classpath hierarchies, because a module may declare an edge as `api` or as
+ * `implementation` and the edge table names the edge, not the configuration.
+ */
+abstract class VerifyModuleDependencies : DefaultTask() {
+
+    @get:Input
+    abstract val moduleName: Property<String>
+
+    @get:Input
+    abstract val allowedEdges: ListProperty<String>
+
+    @get:Input
+    abstract val moduleDependencies: ListProperty<String>
+
+    @TaskAction
+    fun verifyDeclaredDependencies() {
+        ModuleDependencyRule(
+            module = moduleName.get(),
+            allowedEdges = allowedEdges.get(),
+            moduleDependencies = moduleDependencies.get(),
+        ).verify()
+    }
+}
+
+/**
+ * A declared violation and the refusal it must produce. The expected message is
+ * written from the architecture's wording, not from the rule's code, and null
+ * means the rule must accept the declaration.
+ */
+class ModuleDependencyFixture(
+    val what: String,
+    val module: String,
+    val allowedEdges: List<String>,
+    val moduleDependencies: List<String>,
+    val expectedRefusal: String?,
+)
+
+// Each fixture declares a violation the rule has to refuse. The first is
+// criterion 1: a dependency outside the module's edge row. The second guards
+// the other half: an edge the row names is allowed, or every module would fail.
+val moduleDependencyFixtures = listOf(
+    ModuleDependencyFixture(
+        what = "the core declares the cli",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("cli"),
+        expectedRefusal = "core declares a dependency on cli, which its edge row does not allow; the row allows contract",
+    ),
+    ModuleDependencyFixture(
+        what = "the core declares the contract",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("contract"),
+        expectedRefusal = null,
+    ),
+)
+
+/** The message a rule refuses with, or null when it accepts. */
+fun refusalOf(rule: DependencyRule): String? =
+    try {
+        rule.verify()
+        null
+    } catch (refusal: GradleException) {
+        refusal.message
+    }
+
+/** Runs every fixture and collects the ones whose rule did not answer as the fixture says. */
+fun dependencyRuleFixtureProblems(): List<String> {
+    val problems = mutableListOf<String>()
+    moduleDependencyFixtures.forEach { fixture ->
+        val refusal = refusalOf(
+            ModuleDependencyRule(
+                module = fixture.module,
+                allowedEdges = fixture.allowedEdges,
+                moduleDependencies = fixture.moduleDependencies,
+            ),
+        )
+        val expected = fixture.expectedRefusal
+        when {
+            expected == null && refusal != null ->
+                problems.add("Fixture '${fixture.what}' was refused, and it must be accepted: $refusal")
+            expected != null && refusal == null ->
+                problems.add("Fixture '${fixture.what}' was accepted, and it must be refused with: $expected")
+            expected != null && refusal != null && !refusal.contains(expected) ->
+                problems.add("Fixture '${fixture.what}' was refused with '$refusal', and the refusal must carry: $expected")
+        }
+    }
+    return problems
+}
+
+tasks.register("verifyDependencyRuleFixtures") {
+    group = "verification"
+    description = "Proves each dependency rule refuses a declared violation with a message that names it."
+    doLast {
+        val problems = dependencyRuleFixtureProblems()
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "The dependency rule fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
+            )
+        }
+        println("${moduleDependencyFixtures.size} dependency rule fixtures held")
     }
 }
