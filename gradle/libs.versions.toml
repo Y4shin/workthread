@@ -6,6 +6,7 @@ junit = "5.14.4"
 assertj = "3.27.7"
 javafx = "21.0.13"
 spring-boot = "4.2.0"
+mcp-sdk = "2.1.0"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -16,6 +17,10 @@ assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 # two coordinates carry none of their own.
 springBootBom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
 springBootStarterWebmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+# The aggregator carries no code; the JSON mapper is declared explicitly
+# because the SDK does not choose a mapper for its consumer.
+mcpSdk = { module = "io.modelcontextprotocol.sdk:mcp", version.ref = "mcp-sdk" }
+mcpJsonJackson3 = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson3", version.ref = "mcp-sdk" }
 
 [plugins]
 # The JavaFX plugin owns the JavaFX coordinates and the host's platform
