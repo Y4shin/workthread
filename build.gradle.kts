@@ -105,20 +105,39 @@ subprojects {
         val declared = listOf(mainSourceSet.compileClasspathConfigurationName, mainSourceSet.runtimeClasspathConfigurationName)
             .flatMap { classpath -> configurations.getByName(classpath).hierarchy }
             .flatMap { configuration -> configuration.dependencies }
+            .filterNot { dependency -> dependency.isDependencyPlatform() }
+            .distinct()
+        val edges = declared
             .filterIsInstance<ProjectDependency>()
             .map { dependency -> dependency.name }
+            .distinct()
+            .sorted()
+        val libraryCoordinates = declared
+            .filterIsInstance<ExternalModuleDependency>()
+            .map { dependency -> "${dependency.group.orEmpty()}:${dependency.name}" }
             .distinct()
             .sorted()
 
         tasks.register<VerifyModuleDependencies>("verifyModuleDependencies") {
             group = "verification"
-            description = "Refuses a declared dependency the module's edge row does not allow."
+            description = "Refuses a declared dependency the module's edge row does not allow, and Spring or JavaFX in the core."
             moduleName.set(module)
             allowedEdges.set(edgeRow)
-            moduleDependencies.set(declared)
+            moduleDependencies.set(edges)
+            libraries.set(libraryCoordinates)
         }
         tasks.named("check") { dependsOn("verifyModuleDependencies") }
     }
+}
+
+/**
+ * A dependency platform carries constraints, not code: `api` imports the Spring
+ * Boot BOM that way. The edge table governs what a module reaches, and a
+ * platform reaches nothing, so the rule does not judge it.
+ */
+fun Dependency.isDependencyPlatform(): Boolean {
+    val category = (this as? ModuleDependency)?.attributes?.getAttribute(Category.CATEGORY_ATTRIBUTE) ?: return false
+    return category.name == Category.REGULAR_PLATFORM || category.name == Category.ENFORCED_PLATFORM
 }
 
 // One recorded command for the declared stack: it prints the module name each
@@ -206,21 +225,49 @@ abstract class DependencyRule {
 
 /**
  * The declared-dependency rule: a module reaches only the modules its edge row
- * names.
+ * names, and the core carries no framework, or standalone mode needs Spring too.
  */
 class ModuleDependencyRule(
     private val module: String,
     private val allowedEdges: List<String>,
     private val moduleDependencies: List<String>,
+    private val libraries: List<String>,
 ) : DependencyRule() {
 
-    override fun violations(): List<String> = moduleDependencies
-        .filterNot { dependency -> dependency in allowedEdges }
-        .map { dependency ->
-            "$module declares a dependency on $dependency, which its edge row does not allow; the row allows ${row()}"
+    override fun violations(): List<String> {
+        val violations = mutableListOf<String>()
+        moduleDependencies
+            .filterNot { dependency -> dependency in allowedEdges }
+            .forEach { dependency ->
+                violations.add("$module declares a dependency on $dependency, which its edge row does not allow; the row allows ${row()}")
+            }
+        if (module == CORE) {
+            libraries.forEach { library ->
+                val framework = frameworkOf(library) ?: return@forEach
+                violations.add("$module declares $library, which is $framework; the core carries no framework")
+            }
         }
+        return violations
+    }
 
     private fun row(): String = if (allowedEdges.isEmpty()) "nothing" else allowedEdges.joinToString(separator = ", ")
+
+    // The core's rule is about families, not single artifacts: Spring Boot's
+    // artifacts sit under org.springframework.boot and the framework's under
+    // org.springframework, and the JavaFX plugin's artifacts under org.openjfx.
+    private fun frameworkOf(library: String): String? {
+        val group = library.substringBefore(':')
+        val artifact = library.substringAfter(':')
+        return when {
+            group.startsWith("org.springframework") -> "Spring"
+            group == "org.openjfx" || artifact.startsWith("javafx-") -> "JavaFX"
+            else -> null
+        }
+    }
+
+    private companion object {
+        const val CORE = "core"
+    }
 }
 
 /**
@@ -240,12 +287,16 @@ abstract class VerifyModuleDependencies : DefaultTask() {
     @get:Input
     abstract val moduleDependencies: ListProperty<String>
 
+    @get:Input
+    abstract val libraries: ListProperty<String>
+
     @TaskAction
     fun verifyDeclaredDependencies() {
         ModuleDependencyRule(
             module = moduleName.get(),
             allowedEdges = allowedEdges.get(),
             moduleDependencies = moduleDependencies.get(),
+            libraries = libraries.get(),
         ).verify()
     }
 }
@@ -260,6 +311,7 @@ class ModuleDependencyFixture(
     val module: String,
     val allowedEdges: List<String>,
     val moduleDependencies: List<String>,
+    val libraries: List<String>,
     val expectedRefusal: String?,
 )
 
@@ -272,6 +324,7 @@ val moduleDependencyFixtures = listOf(
         module = "core",
         allowedEdges = listOf("contract"),
         moduleDependencies = listOf("cli"),
+        libraries = listOf(),
         expectedRefusal = "core declares a dependency on cli, which its edge row does not allow; the row allows contract",
     ),
     ModuleDependencyFixture(
@@ -279,6 +332,31 @@ val moduleDependencyFixtures = listOf(
         module = "core",
         allowedEdges = listOf("contract"),
         moduleDependencies = listOf("contract"),
+        libraries = listOf(),
+        expectedRefusal = null,
+    ),
+    ModuleDependencyFixture(
+        what = "the core declares Spring",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("contract"),
+        libraries = listOf("org.springframework:spring-context"),
+        expectedRefusal = "core declares org.springframework:spring-context, which is Spring; the core carries no framework",
+    ),
+    ModuleDependencyFixture(
+        what = "the core declares JavaFX",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("contract"),
+        libraries = listOf("org.openjfx:javafx-controls"),
+        expectedRefusal = "core declares org.openjfx:javafx-controls, which is JavaFX; the core carries no framework",
+    ),
+    ModuleDependencyFixture(
+        what = "a surface module declares a library",
+        module = "mcp",
+        allowedEdges = listOf("contract", "wiring"),
+        moduleDependencies = listOf("contract", "wiring"),
+        libraries = listOf("io.modelcontextprotocol.sdk:mcp"),
         expectedRefusal = null,
     ),
 )
@@ -301,6 +379,7 @@ fun dependencyRuleFixtureProblems(): List<String> {
                 module = fixture.module,
                 allowedEdges = fixture.allowedEdges,
                 moduleDependencies = fixture.moduleDependencies,
+                libraries = fixture.libraries,
             ),
         )
         val expected = fixture.expectedRefusal
