@@ -117,6 +117,10 @@ subprojects {
     val edgeRow = moduleEdgeRows[name]
         ?: error("Module ':${name}' has no row in the architecture's edge table; a new module requires an architecture change first.")
 
+    // Read after the module's own build file has run, so its declarations are
+    // in. A plugin that adds coordinates later (the JavaFX plugin does) is the
+    // runtime classpath check's business: what a module *declares* is what a
+    // reader finds in its build file.
     afterEvaluate {
         val module = name
         val mainSourceSet = extensions.getByType<SourceSetContainer>().named("main").get()
