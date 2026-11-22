@@ -26,6 +26,21 @@ class ApiStackTest {
         assertThat(isLoadableWithoutInitialisation("org.springframework.boot.SpringApplication")).isTrue();
     }
 
+    @Test
+    void theTestClasspathStaysOnThePinnedFifthJUnitLineDespiteTheSpringBootPlatform() {
+        assertThat(resolvedJars("junit-jupiter-"))
+                .as("JUnit Jupiter on the API module's test classpath")
+                .contains("junit-jupiter-api-5.14.4.jar")
+                .allSatisfy(jar -> assertThat(jar).doesNotContain("-6."));
+        assertThat(resolvedJars("junit-platform-"))
+                .as("the JUnit Platform on the API module's test classpath")
+                .isNotEmpty()
+                .allSatisfy(jar -> assertThat(jar).doesNotContain("-6."));
+        assertThat(resolvedJars("assertj-core-"))
+                .as("AssertJ on the API module's test classpath")
+                .contains("assertj-core-3.27.7.jar");
+    }
+
     private static List<String> resolvedJars(String prefix) {
         List<String> names = new ArrayList<>();
         for (String property : List.of("java.class.path", "jdk.module.path")) {
