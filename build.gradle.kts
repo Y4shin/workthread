@@ -221,7 +221,7 @@ tasks.register("printPinnedModuleNames") {
 }
 
 // ---------------------------------------------------------------------------
-// The dependency rules, and the fixtures that prove their refusals
+// The dependency rules
 // ---------------------------------------------------------------------------
 
 /**
@@ -320,184 +320,6 @@ abstract class VerifyModuleDependencies : DefaultTask() {
 }
 
 /**
- * A declared violation and the refusal it must produce. The expected message is
- * written from the architecture's wording, not from the rule's code, and null
- * means the rule must accept the declaration.
- */
-class ModuleDependencyFixture(
-    val what: String,
-    val module: String,
-    val allowedEdges: List<String>,
-    val moduleDependencies: List<String>,
-    val libraries: List<String>,
-    val expectedRefusal: String?,
-)
-
-// Each fixture declares a violation the rule has to refuse. The first is
-// criterion 1: a dependency outside the module's edge row. The second guards
-// the other half: an edge the row names is allowed, or every module would fail.
-val moduleDependencyFixtures = listOf(
-    ModuleDependencyFixture(
-        what = "the core declares the cli",
-        module = "core",
-        allowedEdges = listOf("contract"),
-        moduleDependencies = listOf("cli"),
-        libraries = listOf(),
-        expectedRefusal = "core declares a dependency on cli, which its edge row does not allow; the row allows contract",
-    ),
-    ModuleDependencyFixture(
-        what = "the core declares the contract",
-        module = "core",
-        allowedEdges = listOf("contract"),
-        moduleDependencies = listOf("contract"),
-        libraries = listOf(),
-        expectedRefusal = null,
-    ),
-    ModuleDependencyFixture(
-        what = "the core declares Spring",
-        module = "core",
-        allowedEdges = listOf("contract"),
-        moduleDependencies = listOf("contract"),
-        libraries = listOf("org.springframework:spring-context"),
-        expectedRefusal = "core declares org.springframework:spring-context, which is Spring; the core carries no framework",
-    ),
-    ModuleDependencyFixture(
-        what = "the core declares JavaFX",
-        module = "core",
-        allowedEdges = listOf("contract"),
-        moduleDependencies = listOf("contract"),
-        libraries = listOf("org.openjfx:javafx-controls"),
-        expectedRefusal = "core declares org.openjfx:javafx-controls, which is JavaFX; the core carries no framework",
-    ),
-    ModuleDependencyFixture(
-        what = "a surface module declares a library",
-        module = "mcp",
-        allowedEdges = listOf("contract", "wiring"),
-        moduleDependencies = listOf("contract", "wiring"),
-        libraries = listOf("io.modelcontextprotocol.sdk:mcp"),
-        expectedRefusal = null,
-    ),
-)
-
-/** The message a rule refuses with, or null when it accepts. */
-class DependencyRuleFixtures(
-    private val moduleDependencyFixtures: List<ModuleDependencyFixture>,
-    private val runtimeClasspathFixtures: List<RuntimeClasspathFixture>,
-) {
-
-    fun count(): Int = moduleDependencyFixtures.size + runtimeClasspathFixtures.size
-
-    /** The fixtures whose rule did not answer as the fixture says. */
-    fun problems(): List<String> = moduleDependencyProblems() + runtimeClasspathProblems()
-
-    private fun moduleDependencyProblems(): List<String> {
-        val problems = mutableListOf<String>()
-        moduleDependencyFixtures.forEach { fixture ->
-            val refusal = refusalOf(
-                ModuleDependencyRule(
-                    module = fixture.module,
-                    allowedEdges = fixture.allowedEdges,
-                    moduleDependencies = fixture.moduleDependencies,
-                    libraries = fixture.libraries,
-                ),
-            )
-            expectedProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
-        }
-        return problems
-    }
-
-    private fun runtimeClasspathProblems(): List<String> {
-        val problems = mutableListOf<String>()
-        runtimeClasspathFixtures.forEach { fixture ->
-            val refusal = refusalOf(
-                RuntimeClasspathRule(
-                    module = fixture.module,
-                    configuration = fixture.configuration,
-                    artifacts = fixture.artifacts,
-                    mayCarryJavaFx = fixture.mayCarryJavaFx,
-                ),
-            )
-            expectedProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
-        }
-        return problems
-    }
-
-    private fun expectedProblem(problems: MutableList<String>, what: String, expected: String?, refusal: String?) {
-        when {
-            expected == null && refusal != null ->
-                problems.add("Fixture '$what' was refused, and it must be accepted: $refusal")
-            expected != null && refusal == null ->
-                problems.add("Fixture '$what' was accepted, and it must be refused with: $expected")
-            expected != null && refusal != null && !refusal.contains(expected) ->
-                problems.add("Fixture '$what' was refused with '$refusal', and the refusal must carry: $expected")
-        }
-    }
-
-    private fun refusalOf(rule: DependencyRule): String? =
-        try {
-            rule.verify()
-            null
-        } catch (refusal: GradleException) {
-            refusal.message
-        }
-}
-
-// The runtime classpath rule has to refuse JavaFX wherever the client's stack
-// leaks, and accept it in the client, or the real build would fail on its own
-// declared stack.
-val runtimeClasspathFixtures = listOf(
-    RuntimeClasspathFixture(
-        what = "the adapters carry JavaFX",
-        module = "adapters",
-        configuration = "runtimeClasspath",
-        artifacts = listOf("sqlite-jdbc-3.54.1.0.jar", "javafx-controls-21.0.13-linux.jar"),
-        mayCarryJavaFx = false,
-        expectedRefusal = "adapters:runtimeClasspath carries javafx-controls-21.0.13-linux.jar; JavaFX belongs to the client module alone",
-    ),
-    RuntimeClasspathFixture(
-        what = "the client carries JavaFX",
-        module = "client",
-        configuration = "runtimeClasspath",
-        artifacts = listOf("javafx-controls-21.0.13-linux.jar"),
-        mayCarryJavaFx = true,
-        expectedRefusal = null,
-    ),
-)
-
-tasks.register("verifyDependencyRuleFixtures") {
-    group = "verification"
-    description = "Proves each dependency rule refuses a declared violation with a message that names it."
-    // Plain data, so the action needs no reference to the build script itself.
-    val fixtures = DependencyRuleFixtures(moduleDependencyFixtures, runtimeClasspathFixtures)
-    doLast {
-        val problems = fixtures.problems()
-        if (problems.isNotEmpty()) {
-            throw GradleException(
-                "The dependency rule fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
-            )
-        }
-        println("${fixtures.count()} dependency rule fixtures held")
-    }
-}
-
-// The fixtures are part of the suite: `check` runs them, so a rule that stops
-// refusing a declared violation breaks the build rather than going quiet.
-tasks.named("check") { dependsOn("verifyDependencyRuleFixtures") }
-
-/**
- * A JavaFX artifact on a runtime classpath the module does not own, or the
- * refusal it must produce.
- */
-class RuntimeClasspathFixture(
-    val what: String,
-    val module: String,
-    val configuration: String,
-    val artifacts: List<String>,
-    val mayCarryJavaFx: Boolean,
-    val expectedRefusal: String?,
-)
-
-/**
  * The runtime classpath rule: JavaFX is allowed on the client's classpath and
  * on no other module's, and the refusal names the configuration and the
  * artifact so a reader knows where it came from.
@@ -556,3 +378,173 @@ abstract class VerifyNoJavaFxOnRuntimeClasspath : DefaultTask() {
         ).verify()
     }
 }
+
+// ---------------------------------------------------------------------------
+// The fixtures: one declared violation per failure, and the refusal it must
+// produce. The fixture convention is a plain data list plus one task that runs
+// them, so a later check can add its own list and its own task.
+// ---------------------------------------------------------------------------
+
+/**
+ * A declared dependency and the refusal it must produce. The expected message
+ * is written from the architecture's wording, not from a rule's code, and null
+ * means the rule must accept the declaration.
+ */
+class ModuleDependencyFixture(
+    val what: String,
+    val module: String,
+    val allowedEdges: List<String>,
+    val moduleDependencies: List<String>,
+    val libraries: List<String>,
+    val expectedRefusal: String?,
+)
+
+/** An artifact list on a runtime classpath, and the refusal it must produce. */
+class RuntimeClasspathFixture(
+    val what: String,
+    val module: String,
+    val configuration: String,
+    val artifacts: List<String>,
+    val mayCarryJavaFx: Boolean,
+    val expectedRefusal: String?,
+)
+
+// Each fixture declares a violation its rule has to refuse. The accepted ones
+// guard the other half: an edge the row names, a library outside the core, and
+// the client's own JavaFX have to stay allowed, or the real build fails.
+val moduleDependencyFixtures = listOf(
+    ModuleDependencyFixture(
+        what = "the core declares the cli",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("cli"),
+        libraries = listOf(),
+        expectedRefusal = "core declares a dependency on cli, which its edge row does not allow; the row allows contract",
+    ),
+    ModuleDependencyFixture(
+        what = "the core declares the contract",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("contract"),
+        libraries = listOf(),
+        expectedRefusal = null,
+    ),
+    ModuleDependencyFixture(
+        what = "the core declares Spring",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("contract"),
+        libraries = listOf("org.springframework:spring-context"),
+        expectedRefusal = "core declares org.springframework:spring-context, which is Spring; the core carries no framework",
+    ),
+    ModuleDependencyFixture(
+        what = "the core declares JavaFX",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("contract"),
+        libraries = listOf("org.openjfx:javafx-controls"),
+        expectedRefusal = "core declares org.openjfx:javafx-controls, which is JavaFX; the core carries no framework",
+    ),
+    ModuleDependencyFixture(
+        what = "a surface module declares a library",
+        module = "mcp",
+        allowedEdges = listOf("contract", "wiring"),
+        moduleDependencies = listOf("contract", "wiring"),
+        libraries = listOf("io.modelcontextprotocol.sdk:mcp"),
+        expectedRefusal = null,
+    ),
+)
+
+val runtimeClasspathFixtures = listOf(
+    RuntimeClasspathFixture(
+        what = "the adapters carry JavaFX",
+        module = "adapters",
+        configuration = "runtimeClasspath",
+        artifacts = listOf("sqlite-jdbc-3.54.1.0.jar", "javafx-controls-21.0.13-linux.jar"),
+        mayCarryJavaFx = false,
+        expectedRefusal = "adapters:runtimeClasspath carries javafx-controls-21.0.13-linux.jar; JavaFX belongs to the client module alone",
+    ),
+    RuntimeClasspathFixture(
+        what = "the client carries JavaFX",
+        module = "client",
+        configuration = "runtimeClasspath",
+        artifacts = listOf("javafx-controls-21.0.13-linux.jar"),
+        mayCarryJavaFx = true,
+        expectedRefusal = null,
+    ),
+)
+
+/** Runs every fixture and reports the ones whose rule did not answer as the fixture says. */
+class DependencyRuleFixtures(
+    private val moduleDependencyFixtures: List<ModuleDependencyFixture>,
+    private val runtimeClasspathFixtures: List<RuntimeClasspathFixture>,
+) {
+
+    fun count(): Int = moduleDependencyFixtures.size + runtimeClasspathFixtures.size
+
+    fun problems(): List<String> {
+        val problems = mutableListOf<String>()
+        moduleDependencyFixtures.forEach { fixture ->
+            val refusal = refusalOf(
+                ModuleDependencyRule(
+                    module = fixture.module,
+                    allowedEdges = fixture.allowedEdges,
+                    moduleDependencies = fixture.moduleDependencies,
+                    libraries = fixture.libraries,
+                ),
+            )
+            expectedProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        runtimeClasspathFixtures.forEach { fixture ->
+            val refusal = refusalOf(
+                RuntimeClasspathRule(
+                    module = fixture.module,
+                    configuration = fixture.configuration,
+                    artifacts = fixture.artifacts,
+                    mayCarryJavaFx = fixture.mayCarryJavaFx,
+                ),
+            )
+            expectedProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        return problems
+    }
+
+    private fun expectedProblem(problems: MutableList<String>, what: String, expected: String?, refusal: String?) {
+        when {
+            expected == null && refusal != null ->
+                problems.add("Fixture '$what' was refused, and it must be accepted: $refusal")
+            expected != null && refusal == null ->
+                problems.add("Fixture '$what' was accepted, and it must be refused with: $expected")
+            expected != null && refusal != null && !refusal.contains(expected) ->
+                problems.add("Fixture '$what' was refused with '$refusal', and the refusal must carry: $expected")
+        }
+    }
+
+    private fun refusalOf(rule: DependencyRule): String? =
+        try {
+            rule.verify()
+            null
+        } catch (refusal: GradleException) {
+            refusal.message
+        }
+}
+
+tasks.register("verifyDependencyRuleFixtures") {
+    group = "verification"
+    description = "Proves each dependency rule refuses a declared violation with a message that names it."
+    // Plain data, so the action needs no reference to the build script itself.
+    val fixtures = DependencyRuleFixtures(moduleDependencyFixtures, runtimeClasspathFixtures)
+    doLast {
+        val problems = fixtures.problems()
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "The dependency rule fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
+            )
+        }
+        println("${fixtures.count()} dependency rule fixtures held")
+    }
+}
+
+// The fixtures are part of the suite: `check` runs them, so a rule that stops
+// refusing a declared violation breaks the build rather than going quiet.
+tasks.named("check") { dependsOn("verifyDependencyRuleFixtures") }
