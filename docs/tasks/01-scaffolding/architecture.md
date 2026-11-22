@@ -33,9 +33,23 @@ Eight subprojects: `contract`, `core`, `adapters`, `wiring`, `cli`, `mcp`, `api`
 
 No surface module depends on another surface module. A new module requires an architecture change first.
 
-`contract`, `core`, `adapters`, `wiring`, `cli`, `mcp`, and `client` carry `module-info.java` and are named modules. `api` has no descriptor and runs on the classpath, because Spring Boot's classpath model fights named modules. The package root is `io.github.y4shin.workthread`, one subpackage per module.
+The package root is `io.github.y4shin.workthread`, one subpackage per module, and the module name is the package name. `contract`, `core`, `adapters`, `wiring`, `cli`, `mcp`, and `client` carry `module-info.java` under these names, derived once from `packageRoot` in the root build:
 
-A module descriptor cannot export a package that holds no type, and at this point in the effort no module holds one. Each of the seven named modules therefore carries one placeholder type in its package, so its descriptor can export the package. The placeholder is the module's only type until the effort that owns the module adds real ones: that effort replaces the placeholder instead of deleting it, which keeps `contract`'s API snapshot honest. Adding a second type to a module's exported package needs no new decision.
+| Module | Package and module name | Placeholder type |
+| --- | --- | --- |
+| `contract` | `io.github.y4shin.workthread.contract` | `ContractPlaceholder` |
+| `core` | `io.github.y4shin.workthread.core` | `CorePlaceholder` |
+| `adapters` | `io.github.y4shin.workthread.adapters` | `AdaptersPlaceholder` |
+| `wiring` | `io.github.y4shin.workthread.wiring` | `WiringPlaceholder` |
+| `cli` | `io.github.y4shin.workthread.cli` | `CliPlaceholder` |
+| `mcp` | `io.github.y4shin.workthread.mcp` | `McpPlaceholder` |
+| `client` | `io.github.y4shin.workthread.client` | `WorkthreadApplication` |
+
+`api` has no descriptor and runs on the classpath, because Spring Boot's classpath model fights named modules.
+
+A module descriptor cannot export a package that holds no type, so each named module carries one placeholder type in its exported package. The placeholder is the module's only type until the effort that owns the module adds real ones: that effort replaces the placeholder instead of deleting it, which keeps `contract`'s API snapshot honest. `client`'s placeholder is the stand-in for its JavaFX `Application` subclass, which the image work replaces in place.
+
+Anything that names a module inherits this table: `requires` clauses, the image's module set, and any `--add-modules` line.
 
 ## The declared stack
 
@@ -50,8 +64,6 @@ Six facts hold the list together:
 - Jackson 2 versus 3 is settled: both sides use Jackson 3 (`tools.jackson` 3.1.8 from Spring Boot, 3.1.4 from the MCP SDK, resolved upward), both reuse the 2.21 annotations artifact, and no exclusion is needed. `api` never sees the MCP SDK, because surface modules never depend on each other.
 - The module names are confirmed from the resolved jars, not from the notes: `javafx.base`, `javafx.controls`, `javafx.graphics`, `io.modelcontextprotocol.sdk.mcp`, `com.networknt.schema`, `org.xerial.sqlitejdbc`, `org.junit.jupiter.api`, `tools.jackson.databind`, `org.slf4`. `assertj-core` 3.27.7 is named `org.assertj.core` and `jackson-annotations` 2.21 is named `com.fasterxml.jackson.annotation`, so neither is automatic. `reactor-core` and `spring-boot` are automatic. `./gradlew -q printPinnedModuleNames` reprints the table from the resolved jars with `ModuleFinder`.
 
-No module holds a type yet: each main package is declared by a `package-info.java` only. A descriptor cannot export a package that holds no type, so a module gains its first type before its `exports` clause exists.
-
 ## The build's own gates
 
 **The dependency checks.** Two root-build Kotlin checks, attached to `check`, plus one fixture runner.
@@ -62,11 +74,13 @@ The second inspects each module's resolved `runtimeClasspath` and fails when a J
 
 Test scope is not read: the checks cover the main source sets, so a forbidden module edge declared as `testImplementation` passes today.
 
-The messages name the offending module and dependency. No third-party rule plugin.
+**The descriptor check.** One per module, attached to `check`, reading the built jar with `ModuleFinder`. It refuses a missing descriptor, an automatic descriptor, a wrong module name, a `requires` outside the edge row, a missing `requires` for an edge the row names, a missing export, and a descriptor on `api`. For `client` it also refuses a missing application class, or an export set that does not cover that class. It judges build modules only, so a JDK or declared-stack module in `requires` is not judged by the edge table.
 
-**The fixture convention.** Plain data lists holding either a violation and the message its refusal must carry, or a permitted declaration with no expectation; one runner; one root task attached to the root `check`. A fixture proves the rule classes, and end-to-end probes in the `dependency-checks` deviation report prove the wiring from real declarations and resolved classpaths.
+**The fixture convention.** Plain data lists holding either a violation and the message its refusal must carry, or a permitted declaration with no expectation; one runner; one root task attached to the root `check`. The dependency rules carry seven committed fixtures. The descriptor rule currently carries none, and its non-vacuity rests on probes recorded in the `named-modules` deviation report; giving it fixtures is open work.
 
-**Version and additivity.** `0.1.0` lives in one property, and an annotated git tag marks each release. A committed snapshot holds every exported package of `contract`; `check` compares the current surface against it and fails when an exported type or member disappears or changes shape, naming what changed. Because 0.1 exports almost nothing, a committed fixture reproduces a removal so the check's failure path is proven. The snapshot covers `contract` only at 0.1.
+No third-party rule plugin.
+
+**Version and additivity.** `0.1.0` lives in one property, and an annotated git tag marks each release. A committed snapshot holds every exported package of `contract`; `check` compares the current surface against it and fails when an exported type or member disappears or changes shape, naming what changed. Because 0.1 exports almost nothing, a committed fixture reproduces a removal so the check's failure path is proven. The snapshot covers `contract` only at 0.1, and it includes `ContractPlaceholder`.
 
 ## Packaging
 

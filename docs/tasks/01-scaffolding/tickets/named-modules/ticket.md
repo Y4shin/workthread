@@ -24,3 +24,9 @@ The seven modules that reach the image are named Java modules with the inward `r
 ## Blocked by
 
 - `declared-stack`
+
+## Implementation notes
+
+Module names follow the package: `io.github.y4shin.workthread.<module>` for `contract`, `core`, `adapters`, `wiring`, `cli`, `mcp`, and `client`, derived once from `packageRoot` in the root build. `api` carries no descriptor and stays on the classpath. Each placeholder is `<Module>Placeholder` except the client's, which is `WorkthreadApplication`; the `client-image` ticket replaces it in place with the JavaFX `Application` subclass.
+
+`verifyModuleDescriptor` runs per module on `check` and refuses a missing descriptor, an automatic descriptor, a wrong module name, a `requires` outside the edge row, a missing `requires` for a row edge, a missing export, a descriptor on `api`, and for `client` a missing application class. The `requires` rule is checked in both directions but only for modules under the package root, so a JDK or declared-stack module in `requires` is not judged by the edge table. The rule has no committed fixture yet, so its non-vacuity rests on the probes recorded in the deviation report.
