@@ -1,0 +1,12 @@
+# The only place a library or plugin version appears. A subproject declares
+# coordinates without versions.
+
+[versions]
+junit = "5.14.4"
+assertj = "3.27.7"
+
+[libraries]
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
