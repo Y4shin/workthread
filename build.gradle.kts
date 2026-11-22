@@ -67,10 +67,10 @@ val moduleEdgeRows: Map<String, List<String>> = mapOf(
 val packageRoot = "io.github.y4shin.workthread"
 fun qualifiedNameOf(module: String): String = "$packageRoot.$module"
 
-// Seven modules reach the image as named modules. `api` stays on the classpath,
-// because Spring Boot's classpath model fights named modules, so it carries no
-// descriptor. One set, so the classpath module is not a special case anywhere
-// else in this script.
+// Seven modules carry a descriptor. `api` stays on the classpath, because
+// Spring Boot's classpath model fights named modules, so its jar carries none.
+// One set, so the classpath module is not a special case anywhere else in this
+// script.
 val modulesOnTheClasspath: Set<String> = setOf("api")
 
 // The client's descriptor must export the package that holds its `Application`
