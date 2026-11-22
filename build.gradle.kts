@@ -58,6 +58,19 @@ val moduleEdgeRows: Map<String, List<String>> = mapOf(
     "client" to listOf("contract", "wiring"),
 )
 
+// The package root, one subpackage per module. A module's name is its package:
+// `contract` is the module `io.github.y4shin.workthread.contract` and exports
+// `io.github.y4shin.workthread.contract`. One derivation, so a module's name and
+// its one exported package cannot drift apart.
+val packageRoot = "io.github.y4shin.workthread"
+fun qualifiedNameOf(module: String): String = "$packageRoot.$module"
+
+// Seven modules reach the image as named modules. `api` stays on the classpath,
+// because Spring Boot's classpath model fights named modules, so it carries no
+// descriptor. One set, so the classpath module is not a special case anywhere
+// else in this script.
+val modulesOnTheClasspath: Set<String> = setOf("api")
+
 // The declared stack puts JavaFX in the client alone. The runtime only warns
 // when JavaFX sits on the classpath, so the build refuses a JavaFX artifact
 // everywhere else.
@@ -150,6 +163,21 @@ subprojects {
         }
         tasks.named("check") { dependsOn("verifyModuleDependencies") }
     }
+
+    // The descriptor check: the seven modules that reach the image are named
+    // modules and `api` is not. The descriptor is the single source for a
+    // module's name and exports, so the build reads the built jar rather than a
+    // build script's text.
+    tasks.register<VerifyModuleDescriptor>("verifyModuleDescriptor") {
+        group = "verification"
+        description = "Refuses a module whose descriptor is missing, misnamed, or declares something its edge row does not allow."
+        moduleName.set(project.name)
+        expectedModuleName.set(if (project.name in modulesOnTheClasspath) "" else qualifiedNameOf(project.name))
+        expectedPackage.set(qualifiedNameOf(project.name))
+        allowedModuleNames.set(edgeRow.map { dependency -> qualifiedNameOf(dependency) })
+        descriptorJar.set(tasks.named<Jar>("jar").flatMap { jar -> jar.archiveFile })
+    }
+    tasks.named("check") { dependsOn("verifyModuleDescriptor") }
 }
 
 /**
@@ -379,6 +407,76 @@ abstract class VerifyNoJavaFxOnRuntimeClasspath : DefaultTask() {
             configuration = configurationName.get(),
             artifacts = runtimeClasspath.files.map { jar -> jar.name },
             mayCarryJavaFx = mayCarryJavaFx.get(),
+        ).verify()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The named modules
+// ---------------------------------------------------------------------------
+
+/**
+ * The descriptor rule: a named module's jar carries a descriptor, a classpath
+ * module's jar carries none, and the descriptor agrees with the module's edge
+ * row. Every violation names the module, so a reader can fix the build without
+ * opening the rule.
+ */
+class ModuleDescriptorRule(
+    private val module: String,
+    private val expectedModuleName: String?,
+    private val expectedPackage: String,
+    private val allowedModuleNames: List<String>,
+    private val jar: File,
+) : DependencyRule() {
+
+    override fun violations(): List<String> {
+        val descriptor = explicitDescriptor()
+        if (expectedModuleName == null) {
+            return if (descriptor == null) {
+                listOf()
+            } else {
+                listOf("$module runs on the classpath and its jar carries the module descriptor ${descriptor.name()}; only the seven named modules carry one")
+            }
+        }
+        if (descriptor == null) {
+            return listOf("$module's jar carries no module descriptor; $expectedModuleName is a named module")
+        }
+        return listOf()
+    }
+
+    // An automatic module is derived from a jar's name, not declared, so it does
+    // not count as a descriptor a reader can read the exports from.
+    private fun explicitDescriptor() =
+        ModuleFinder.of(jar.toPath()).findAll().singleOrNull()?.descriptor()?.takeUnless { descriptor -> descriptor.isAutomatic }
+}
+
+/** One module's built jar, checked against the module it must declare. */
+abstract class VerifyModuleDescriptor : DefaultTask() {
+
+    @get:Input
+    abstract val moduleName: Property<String>
+
+    @get:Input
+    abstract val expectedModuleName: Property<String>
+
+    @get:Input
+    abstract val expectedPackage: Property<String>
+
+    @get:Input
+    abstract val allowedModuleNames: ListProperty<String>
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val descriptorJar: RegularFileProperty
+
+    @TaskAction
+    fun verifyDescriptor() {
+        ModuleDescriptorRule(
+            module = moduleName.get(),
+            expectedModuleName = expectedModuleName.get().ifEmpty { null },
+            expectedPackage = expectedPackage.get(),
+            allowedModuleNames = allowedModuleNames.get(),
+            jar = descriptorJar.get().asFile,
         ).verify()
     }
 }
