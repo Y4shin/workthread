@@ -380,65 +380,67 @@ val moduleDependencyFixtures = listOf(
 )
 
 /** The message a rule refuses with, or null when it accepts. */
-fun refusalOf(rule: DependencyRule): String? =
-    try {
-        rule.verify()
-        null
-    } catch (refusal: GradleException) {
-        refusal.message
+class DependencyRuleFixtures(
+    private val moduleDependencyFixtures: List<ModuleDependencyFixture>,
+    private val runtimeClasspathFixtures: List<RuntimeClasspathFixture>,
+) {
+
+    fun count(): Int = moduleDependencyFixtures.size + runtimeClasspathFixtures.size
+
+    /** The fixtures whose rule did not answer as the fixture says. */
+    fun problems(): List<String> = moduleDependencyProblems() + runtimeClasspathProblems()
+
+    private fun moduleDependencyProblems(): List<String> {
+        val problems = mutableListOf<String>()
+        moduleDependencyFixtures.forEach { fixture ->
+            val refusal = refusalOf(
+                ModuleDependencyRule(
+                    module = fixture.module,
+                    allowedEdges = fixture.allowedEdges,
+                    moduleDependencies = fixture.moduleDependencies,
+                    libraries = fixture.libraries,
+                ),
+            )
+            expectedProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        return problems
     }
 
-/** Runs every fixture and collects the ones whose rule did not answer as the fixture says. */
-fun dependencyRuleFixtureProblems(): List<String> {
-    val problems = mutableListOf<String>()
-    moduleDependencyFixtures.forEach { fixture ->
-        val refusal = refusalOf(
-            ModuleDependencyRule(
-                module = fixture.module,
-                allowedEdges = fixture.allowedEdges,
-                moduleDependencies = fixture.moduleDependencies,
-                libraries = fixture.libraries,
-            ),
-        )
-        val expected = fixture.expectedRefusal
+    private fun runtimeClasspathProblems(): List<String> {
+        val problems = mutableListOf<String>()
+        runtimeClasspathFixtures.forEach { fixture ->
+            val refusal = refusalOf(
+                RuntimeClasspathRule(
+                    module = fixture.module,
+                    configuration = fixture.configuration,
+                    artifacts = fixture.artifacts,
+                    mayCarryJavaFx = fixture.mayCarryJavaFx,
+                ),
+            )
+            expectedProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        return problems
+    }
+
+    private fun expectedProblem(problems: MutableList<String>, what: String, expected: String?, refusal: String?) {
         when {
             expected == null && refusal != null ->
-                problems.add("Fixture '${fixture.what}' was refused, and it must be accepted: $refusal")
+                problems.add("Fixture '$what' was refused, and it must be accepted: $refusal")
             expected != null && refusal == null ->
-                problems.add("Fixture '${fixture.what}' was accepted, and it must be refused with: $expected")
+                problems.add("Fixture '$what' was accepted, and it must be refused with: $expected")
             expected != null && refusal != null && !refusal.contains(expected) ->
-                problems.add("Fixture '${fixture.what}' was refused with '$refusal', and the refusal must carry: $expected")
+                problems.add("Fixture '$what' was refused with '$refusal', and the refusal must carry: $expected")
         }
     }
-    return problems
-}
 
-tasks.register("verifyDependencyRuleFixtures") {
-    group = "verification"
-    description = "Proves each dependency rule refuses a declared violation with a message that names it."
-    doLast {
-        val problems = dependencyRuleFixtureProblems() + runtimeClasspathFixtureProblems()
-        if (problems.isNotEmpty()) {
-            throw GradleException(
-                "The dependency rule fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
-            )
+    private fun refusalOf(rule: DependencyRule): String? =
+        try {
+            rule.verify()
+            null
+        } catch (refusal: GradleException) {
+            refusal.message
         }
-        println("${moduleDependencyFixtures.size + runtimeClasspathFixtures.size} dependency rule fixtures held")
-    }
 }
-
-/**
- * A JavaFX artifact on a runtime classpath the module does not own, or the
- * refusal it must produce.
- */
-class RuntimeClasspathFixture(
-    val what: String,
-    val module: String,
-    val configuration: String,
-    val artifacts: List<String>,
-    val mayCarryJavaFx: Boolean,
-    val expectedRefusal: String?,
-)
 
 // The runtime classpath rule has to refuse JavaFX wherever the client's stack
 // leaks, and accept it in the client, or the real build would fail on its own
@@ -460,6 +462,39 @@ val runtimeClasspathFixtures = listOf(
         mayCarryJavaFx = true,
         expectedRefusal = null,
     ),
+)
+
+tasks.register("verifyDependencyRuleFixtures") {
+    group = "verification"
+    description = "Proves each dependency rule refuses a declared violation with a message that names it."
+    // Plain data, so the action needs no reference to the build script itself.
+    val fixtures = DependencyRuleFixtures(moduleDependencyFixtures, runtimeClasspathFixtures)
+    doLast {
+        val problems = fixtures.problems()
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "The dependency rule fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
+            )
+        }
+        println("${fixtures.count()} dependency rule fixtures held")
+    }
+}
+
+// The fixtures are part of the suite: `check` runs them, so a rule that stops
+// refusing a declared violation breaks the build rather than going quiet.
+tasks.named("check") { dependsOn("verifyDependencyRuleFixtures") }
+
+/**
+ * A JavaFX artifact on a runtime classpath the module does not own, or the
+ * refusal it must produce.
+ */
+class RuntimeClasspathFixture(
+    val what: String,
+    val module: String,
+    val configuration: String,
+    val artifacts: List<String>,
+    val mayCarryJavaFx: Boolean,
+    val expectedRefusal: String?,
 )
 
 /**
@@ -520,28 +555,4 @@ abstract class VerifyNoJavaFxOnRuntimeClasspath : DefaultTask() {
             mayCarryJavaFx = mayCarryJavaFx.get(),
         ).verify()
     }
-}
-
-fun runtimeClasspathFixtureProblems(): List<String> {
-    val problems = mutableListOf<String>()
-    runtimeClasspathFixtures.forEach { fixture ->
-        val refusal = refusalOf(
-            RuntimeClasspathRule(
-                module = fixture.module,
-                configuration = fixture.configuration,
-                artifacts = fixture.artifacts,
-                mayCarryJavaFx = fixture.mayCarryJavaFx,
-            ),
-        )
-        val expected = fixture.expectedRefusal
-        when {
-            expected == null && refusal != null ->
-                problems.add("Fixture '${fixture.what}' was refused, and it must be accepted: $refusal")
-            expected != null && refusal == null ->
-                problems.add("Fixture '${fixture.what}' was accepted, and it must be refused with: $expected")
-            expected != null && refusal != null && !refusal.contains(expected) ->
-                problems.add("Fixture '${fixture.what}' was refused with '$refusal', and the refusal must carry: $expected")
-        }
-    }
-    return problems
 }
