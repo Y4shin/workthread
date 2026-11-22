@@ -29,3 +29,6 @@ sqliteJdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 # The JavaFX plugin owns the JavaFX coordinates and the host's platform
 # classifier; the client never declares a JavaFX jar by hand.
 javafx = { id = "org.openjfx.javafxplugin", version = "0.1.0" }
+# The jlink plugin owns the runtime image and its launcher; there is no second
+# image tool.
+jlink = { id = "org.beryx.jlink", version = "4.2.0" }
