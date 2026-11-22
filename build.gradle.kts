@@ -182,6 +182,7 @@ subprojects {
         expectedModuleName.set(if (project.name in modulesOnTheClasspath) "" else qualifiedNameOf(project.name))
         expectedPackage.set(qualifiedNameOf(project.name))
         allowedModuleNames.set(edgeRow.map { dependency -> qualifiedNameOf(dependency) })
+        moduleNamespace.set("$packageRoot.")
         applicationClass.set(clientApplicationClass.takeIf { project.name == "client" }.orEmpty())
         descriptorJar.set(tasks.named<Jar>("jar").flatMap { jar -> jar.archiveFile })
     }
@@ -434,6 +435,7 @@ class ModuleDescriptorRule(
     private val expectedModuleName: String?,
     private val expectedPackage: String,
     private val allowedModuleNames: List<String>,
+    private val moduleNamespace: String,
     private val applicationClass: String?,
     private val jar: File,
 ) : DependencyRule() {
@@ -454,7 +456,7 @@ class ModuleDescriptorRule(
         if (descriptor.name() != expectedModuleName) {
             violations.add("$module's jar reports the module name ${descriptor.name()}, and its descriptor must declare $expectedModuleName")
         }
-        val required = projectModulesRequiredBy(descriptor)
+        val required = buildModulesRequiredBy(descriptor)
         required.filterNot { name -> name in allowedModuleNames }.forEach { name ->
             violations.add("$module requires $name, which its edge row does not allow; the row allows ${row()}")
         }
@@ -479,12 +481,14 @@ class ModuleDescriptorRule(
     private fun jarContains(type: String): Boolean =
         ZipFile(jar).use { archive -> archive.getEntry(type.replace('.', '/') + ".class") != null }
 
-    // A `requires` of a JDK module (`java.logging`) is not an edge in the
-    // architecture's table, so the rule judges only the modules of this build.
-    private fun projectModulesRequiredBy(descriptor: ModuleDescriptor): List<String> =
+    // The edge table names modules of this build. A JDK module (`java.logging`)
+    // and an external module from the declared stack (`javafx.controls`) are not
+    // edges in that table, so the rule judges the build's own modules and leaves
+    // the rest to the declared stack's checks.
+    private fun buildModulesRequiredBy(descriptor: ModuleDescriptor): List<String> =
         descriptor.requires()
             .map { requires -> requires.name() }
-            .filterNot { name -> ModuleFinder.ofSystem().find(name).isPresent }
+            .filter { name -> name.startsWith(moduleNamespace) }
             .sorted()
 
     private fun exportedPackages(descriptor: ModuleDescriptor): List<String> =
@@ -514,6 +518,9 @@ abstract class VerifyModuleDescriptor : DefaultTask() {
     abstract val allowedModuleNames: ListProperty<String>
 
     @get:Input
+    abstract val moduleNamespace: Property<String>
+
+    @get:Input
     abstract val applicationClass: Property<String>
 
     @get:InputFile
@@ -527,6 +534,7 @@ abstract class VerifyModuleDescriptor : DefaultTask() {
             expectedModuleName = expectedModuleName.get().ifEmpty { null },
             expectedPackage = expectedPackage.get(),
             allowedModuleNames = allowedModuleNames.get(),
+            moduleNamespace = moduleNamespace.get(),
             applicationClass = applicationClass.get().ifEmpty { null },
             jar = descriptorJar.get().asFile,
         ).verify()
