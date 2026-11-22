@@ -4,7 +4,9 @@
 
 import java.io.File
 import java.lang.module.ModuleFinder
+import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.artifacts.VersionCatalogsExtension
+import org.gradle.api.attributes.Category
 
 plugins {
     base
@@ -41,6 +43,26 @@ val pinnedJarArtifactNames = listOf(
     "assertj-core",
 )
 
+// The architecture's "May depend on" table, one row per module. This is the
+// build's copy of the table, and the dependency check's only source for what a
+// module may reach: a module with no row is not part of the architecture, so it
+// cannot be checked at all.
+val moduleEdgeRows: Map<String, List<String>> = mapOf(
+    "contract" to listOf(),
+    "core" to listOf("contract"),
+    "adapters" to listOf("contract"),
+    "wiring" to listOf("contract"),
+    "cli" to listOf("contract", "wiring"),
+    "mcp" to listOf("contract", "wiring"),
+    "api" to listOf("contract", "wiring"),
+    "client" to listOf("contract", "wiring"),
+)
+
+// The declared stack puts JavaFX in the client alone. The runtime only warns
+// when JavaFX sits on the classpath, so the build refuses a JavaFX artifact
+// everywhere else.
+val moduleRowsCarryingJavaFx: Set<String> = setOf("client")
+
 subprojects {
     apply(plugin = "java-library")
 
@@ -75,6 +97,69 @@ subprojects {
         resolvedJars.from(configurations.named("testRuntimeClasspath"))
         report.set(layout.buildDirectory.file("reports/declared-stack/module-names.tsv"))
     }
+
+    // The runtime classpath check: a JavaFX artifact on the classpath instead of
+    // the module path is a leak the runtime only warns about, so the build
+    // refuses it.
+    tasks.register<VerifyNoJavaFxOnRuntimeClasspath>("verifyNoJavaFxOnRuntimeClasspath") {
+        group = "verification"
+        description = "Refuses a JavaFX artifact on a runtime classpath the declared stack does not allow one on."
+        moduleName.set(project.name)
+        configurationName.set("runtimeClasspath")
+        mayCarryJavaFx.set(project.name in moduleRowsCarryingJavaFx)
+        runtimeClasspath.from(configurations.named("runtimeClasspath"))
+    }
+    tasks.named("check") { dependsOn("verifyNoJavaFxOnRuntimeClasspath") }
+
+    // The edge row this module obeys. A module with no row is not part of the
+    // architecture, so no row can allow its dependencies and the build stops
+    // instead of checking it against nothing.
+    val edgeRow = moduleEdgeRows[name]
+        ?: error("Module ':${name}' has no row in the architecture's edge table; a new module requires an architecture change first.")
+
+    // Read after the module's own build file has run, so its declarations are
+    // in. A plugin that adds coordinates later (the JavaFX plugin does) is the
+    // runtime classpath check's business: what a module *declares* is what a
+    // reader finds in its build file.
+    afterEvaluate {
+        val module = name
+        val mainSourceSet = extensions.getByType<SourceSetContainer>().named("main").get()
+        val declared = listOf(mainSourceSet.compileClasspathConfigurationName, mainSourceSet.runtimeClasspathConfigurationName)
+            .flatMap { classpath -> configurations.getByName(classpath).hierarchy }
+            .flatMap { configuration -> configuration.dependencies }
+            .filterNot { dependency -> dependency.isDependencyPlatform() }
+            .distinct()
+        val edges = declared
+            .filterIsInstance<ProjectDependency>()
+            .map { dependency -> dependency.name }
+            .distinct()
+            .sorted()
+        val libraryCoordinates = declared
+            .filterIsInstance<ExternalModuleDependency>()
+            .map { dependency -> "${dependency.group.orEmpty()}:${dependency.name}" }
+            .distinct()
+            .sorted()
+
+        tasks.register<VerifyModuleDependencies>("verifyModuleDependencies") {
+            group = "verification"
+            description = "Refuses a declared dependency the module's edge row does not allow, and Spring or JavaFX in the core."
+            moduleName.set(module)
+            allowedEdges.set(edgeRow)
+            moduleDependencies.set(edges)
+            libraries.set(libraryCoordinates)
+        }
+        tasks.named("check") { dependsOn("verifyModuleDependencies") }
+    }
+}
+
+/**
+ * A dependency platform carries constraints, not code: `api` imports the Spring
+ * Boot BOM that way. The edge table governs what a module reaches, and a
+ * platform reaches nothing, so the rule does not judge it.
+ */
+fun Dependency.isDependencyPlatform(): Boolean {
+    val category = (this as? ModuleDependency)?.attributes?.getAttribute(Category.CATEGORY_ATTRIBUTE) ?: return false
+    return category.name == Category.REGULAR_PLATFORM || category.name == Category.ENFORCED_PLATFORM
 }
 
 // One recorded command for the declared stack: it prints the module name each
@@ -138,3 +223,332 @@ tasks.register("printPinnedModuleNames") {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// The dependency rules
+// ---------------------------------------------------------------------------
+
+/**
+ * A rule that names every violation it finds, then refuses the build. The
+ * message is part of the behaviour: it says which module, and what it declared,
+ * so a reader can fix the build without opening the rule.
+ */
+abstract class DependencyRule {
+
+    abstract fun violations(): List<String>
+
+    fun verify() {
+        val violations = violations()
+        if (violations.isNotEmpty()) {
+            throw GradleException(violations.joinToString(separator = "\n"))
+        }
+    }
+}
+
+/**
+ * The declared-dependency rule: a module reaches only the modules its edge row
+ * names, and the core carries no framework, or standalone mode needs Spring too.
+ */
+class ModuleDependencyRule(
+    private val module: String,
+    private val allowedEdges: List<String>,
+    private val moduleDependencies: List<String>,
+    private val libraries: List<String>,
+) : DependencyRule() {
+
+    override fun violations(): List<String> {
+        val violations = mutableListOf<String>()
+        moduleDependencies
+            .filterNot { dependency -> dependency in allowedEdges }
+            .forEach { dependency ->
+                violations.add("$module declares a dependency on $dependency, which its edge row does not allow; the row allows ${row()}")
+            }
+        if (module == CORE) {
+            libraries.forEach { library ->
+                val framework = frameworkOf(library) ?: return@forEach
+                violations.add("$module declares $library, which is $framework; the core carries no framework")
+            }
+        }
+        return violations
+    }
+
+    private fun row(): String = if (allowedEdges.isEmpty()) "nothing" else allowedEdges.joinToString(separator = ", ")
+
+    // The core's rule is about families, not single artifacts: Spring Boot's
+    // artifacts sit under org.springframework.boot and the framework's under
+    // org.springframework, and the JavaFX plugin's artifacts under org.openjfx.
+    private fun frameworkOf(library: String): String? {
+        val group = library.substringBefore(':')
+        val artifact = library.substringAfter(':')
+        return when {
+            group.startsWith("org.springframework") -> "Spring"
+            group == "org.openjfx" || artifact.startsWith("javafx-") -> "JavaFX"
+            else -> null
+        }
+    }
+
+    private companion object {
+        const val CORE = "core"
+    }
+}
+
+/**
+ * One module's declared dependencies, checked against its edge row. The task
+ * reads the declarations the module's own build file made, across both
+ * classpath hierarchies, because a module may declare an edge as `api` or as
+ * `implementation` and the edge table names the edge, not the configuration.
+ */
+abstract class VerifyModuleDependencies : DefaultTask() {
+
+    @get:Input
+    abstract val moduleName: Property<String>
+
+    @get:Input
+    abstract val allowedEdges: ListProperty<String>
+
+    @get:Input
+    abstract val moduleDependencies: ListProperty<String>
+
+    @get:Input
+    abstract val libraries: ListProperty<String>
+
+    @TaskAction
+    fun verifyDeclaredDependencies() {
+        ModuleDependencyRule(
+            module = moduleName.get(),
+            allowedEdges = allowedEdges.get(),
+            moduleDependencies = moduleDependencies.get(),
+            libraries = libraries.get(),
+        ).verify()
+    }
+}
+
+/**
+ * The runtime classpath rule: JavaFX is allowed on the client's classpath and
+ * on no other module's, and the refusal names the configuration and the
+ * artifact so a reader knows where it came from.
+ */
+class RuntimeClasspathRule(
+    private val module: String,
+    private val configuration: String,
+    private val artifacts: List<String>,
+    private val mayCarryJavaFx: Boolean,
+) : DependencyRule() {
+
+    override fun violations(): List<String> {
+        if (mayCarryJavaFx) {
+            return listOf()
+        }
+        return artifacts
+            .filter { artifact -> artifact.startsWith(JAVA_FX_PREFIX) }
+            .distinct()
+            .sorted()
+            .map { artifact -> "$module:$configuration carries $artifact; JavaFX belongs to the client module alone" }
+    }
+
+    private companion object {
+        const val JAVA_FX_PREFIX = "javafx-"
+    }
+}
+
+/**
+ * One module's resolved runtime classpath, refused when a JavaFX artifact
+ * appears on it. The classpath is read after resolution, not from the declared
+ * coordinates: JavaFX reaches a classpath through a transitive dependency as
+ * easily as directly.
+ */
+abstract class VerifyNoJavaFxOnRuntimeClasspath : DefaultTask() {
+
+    @get:Input
+    abstract val moduleName: Property<String>
+
+    @get:Input
+    abstract val configurationName: Property<String>
+
+    @get:Input
+    abstract val mayCarryJavaFx: Property<Boolean>
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val runtimeClasspath: ConfigurableFileCollection
+
+    @TaskAction
+    fun verifyResolvedClasspath() {
+        RuntimeClasspathRule(
+            module = moduleName.get(),
+            configuration = configurationName.get(),
+            artifacts = runtimeClasspath.files.map { jar -> jar.name },
+            mayCarryJavaFx = mayCarryJavaFx.get(),
+        ).verify()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The fixtures: one declared violation per failure, and the refusal it must
+// produce. The fixture convention is a plain data list plus one task that runs
+// them, so a later check can add its own list and its own task.
+// ---------------------------------------------------------------------------
+
+/**
+ * A declared dependency and the refusal it must produce. The expected message
+ * is written from the architecture's wording, not from a rule's code, and null
+ * means the rule must accept the declaration.
+ */
+class ModuleDependencyFixture(
+    val what: String,
+    val module: String,
+    val allowedEdges: List<String>,
+    val moduleDependencies: List<String>,
+    val libraries: List<String>,
+    val expectedRefusal: String?,
+)
+
+/** An artifact list on a runtime classpath, and the refusal it must produce. */
+class RuntimeClasspathFixture(
+    val what: String,
+    val module: String,
+    val configuration: String,
+    val artifacts: List<String>,
+    val mayCarryJavaFx: Boolean,
+    val expectedRefusal: String?,
+)
+
+// Each fixture declares a violation its rule has to refuse. The accepted ones
+// guard the other half: an edge the row names, a library outside the core, and
+// the client's own JavaFX have to stay allowed, or the real build fails.
+val moduleDependencyFixtures = listOf(
+    ModuleDependencyFixture(
+        what = "the core declares the cli",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("cli"),
+        libraries = listOf(),
+        expectedRefusal = "core declares a dependency on cli, which its edge row does not allow; the row allows contract",
+    ),
+    ModuleDependencyFixture(
+        what = "the core declares the contract",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("contract"),
+        libraries = listOf(),
+        expectedRefusal = null,
+    ),
+    ModuleDependencyFixture(
+        what = "the core declares Spring",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("contract"),
+        libraries = listOf("org.springframework:spring-context"),
+        expectedRefusal = "core declares org.springframework:spring-context, which is Spring; the core carries no framework",
+    ),
+    ModuleDependencyFixture(
+        what = "the core declares JavaFX",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("contract"),
+        libraries = listOf("org.openjfx:javafx-controls"),
+        expectedRefusal = "core declares org.openjfx:javafx-controls, which is JavaFX; the core carries no framework",
+    ),
+    ModuleDependencyFixture(
+        what = "a surface module declares a library",
+        module = "mcp",
+        allowedEdges = listOf("contract", "wiring"),
+        moduleDependencies = listOf("contract", "wiring"),
+        libraries = listOf("io.modelcontextprotocol.sdk:mcp"),
+        expectedRefusal = null,
+    ),
+)
+
+val runtimeClasspathFixtures = listOf(
+    RuntimeClasspathFixture(
+        what = "the adapters carry JavaFX",
+        module = "adapters",
+        configuration = "runtimeClasspath",
+        artifacts = listOf("sqlite-jdbc-3.54.1.0.jar", "javafx-controls-21.0.13-linux.jar"),
+        mayCarryJavaFx = false,
+        expectedRefusal = "adapters:runtimeClasspath carries javafx-controls-21.0.13-linux.jar; JavaFX belongs to the client module alone",
+    ),
+    RuntimeClasspathFixture(
+        what = "the client carries JavaFX",
+        module = "client",
+        configuration = "runtimeClasspath",
+        artifacts = listOf("javafx-controls-21.0.13-linux.jar"),
+        mayCarryJavaFx = true,
+        expectedRefusal = null,
+    ),
+)
+
+/** Runs every fixture and reports the ones whose rule did not answer as the fixture says. */
+class DependencyRuleFixtures(
+    private val moduleDependencyFixtures: List<ModuleDependencyFixture>,
+    private val runtimeClasspathFixtures: List<RuntimeClasspathFixture>,
+) {
+
+    fun count(): Int = moduleDependencyFixtures.size + runtimeClasspathFixtures.size
+
+    fun problems(): List<String> {
+        val problems = mutableListOf<String>()
+        moduleDependencyFixtures.forEach { fixture ->
+            val refusal = refusalOf(
+                ModuleDependencyRule(
+                    module = fixture.module,
+                    allowedEdges = fixture.allowedEdges,
+                    moduleDependencies = fixture.moduleDependencies,
+                    libraries = fixture.libraries,
+                ),
+            )
+            expectedProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        runtimeClasspathFixtures.forEach { fixture ->
+            val refusal = refusalOf(
+                RuntimeClasspathRule(
+                    module = fixture.module,
+                    configuration = fixture.configuration,
+                    artifacts = fixture.artifacts,
+                    mayCarryJavaFx = fixture.mayCarryJavaFx,
+                ),
+            )
+            expectedProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        return problems
+    }
+
+    private fun expectedProblem(problems: MutableList<String>, what: String, expected: String?, refusal: String?) {
+        when {
+            expected == null && refusal != null ->
+                problems.add("Fixture '$what' was refused, and it must be accepted: $refusal")
+            expected != null && refusal == null ->
+                problems.add("Fixture '$what' was accepted, and it must be refused with: $expected")
+            expected != null && refusal != null && !refusal.contains(expected) ->
+                problems.add("Fixture '$what' was refused with '$refusal', and the refusal must carry: $expected")
+        }
+    }
+
+    private fun refusalOf(rule: DependencyRule): String? =
+        try {
+            rule.verify()
+            null
+        } catch (refusal: GradleException) {
+            refusal.message
+        }
+}
+
+tasks.register("verifyDependencyRuleFixtures") {
+    group = "verification"
+    description = "Proves each dependency rule refuses a declared violation with a message that names it."
+    // Plain data, so the action needs no reference to the build script itself.
+    val fixtures = DependencyRuleFixtures(moduleDependencyFixtures, runtimeClasspathFixtures)
+    doLast {
+        val problems = fixtures.problems()
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "The dependency rule fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
+            )
+        }
+        println("${fixtures.count()} dependency rule fixtures held")
+    }
+}
+
+// The fixtures are part of the suite: `check` runs them, so a rule that stops
+// refusing a declared violation breaks the build rather than going quiet.
+tasks.named("check") { dependsOn("verifyDependencyRuleFixtures") }
