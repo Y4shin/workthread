@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Declare the real stack and prove it resolves
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - walking-skeleton
 size: m
