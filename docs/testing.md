@@ -2,17 +2,24 @@
 
 ## Framework
 
+In the repository now:
+
+- JUnit 5 (Jupiter) 5.14.4 and AssertJ 3.27.7 in every module, so each module's
+  test task runs a real test from the first commit.
+- A Java 21 toolchain per module, so a test runs on the JDK the toolchain
+  resolves to regardless of the launcher JDK.
+
 Planned, not yet present in the repository:
 
-- JUnit 5 (Jupiter) for unit tests.
 - Spring Boot Test (`@SpringBootTest` with `MockMvc`) for the API module.
 - TestFX for JavaFX view tests, headless through Monocle where possible.
 
 ## Build tool
 
-Provisional: Maven, through the committed wrapper `./mvnw`. The build tool is
-not chosen yet. If the project adopts Gradle, replace every command below and
-delete this note.
+Gradle 9.9.1 through the committed wrapper `./gradlew`, with Kotlin DSL build
+files, one version catalogue in `gradle/libs.versions.toml`, and the
+configuration cache on. Always use the wrapper: the version in
+`gradle/wrapper/gradle-wrapper.properties` is the one the build supports.
 
 ## Test protocol
 
@@ -22,12 +29,14 @@ caller passes its number.
 
 Run these always:
 
-- `./mvnw -q test` -- the full test suite
-- `./mvnw -q -DskipTests verify` -- compile and run the configured checks
+- `./gradlew test` -- the full test suite
+- `./gradlew build` -- compile everything, run the tests, and run the checks
+  attached to `check`
 
 Run if asked (by number):
 
-1. `./mvnw -q -Dtest=<TestClass> test` -- one test class, for a focused gate
+1. `./gradlew :<module>:test --tests <fully.qualified.TestClass>` -- one test
+   class, for a focused gate
 
 ## Mock conventions
 
