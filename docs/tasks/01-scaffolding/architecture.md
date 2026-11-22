@@ -52,7 +52,17 @@ No module holds a type yet: each main package is declared by a `package-info.jav
 
 ## The build's own gates
 
-**The dependency checks.** Two root-build Kotlin checks, attached to `check`. The first reads each module's declared dependencies and fails when a module depends on something its edge row forbids, naming the module and the dependency; it also fails when `core` declares Spring or JavaFX. The second inspects the runtime classpaths and fails when a JavaFX artifact appears on one. The messages name the offending module and dependency. No third-party rule plugin.
+**The dependency checks.** Two root-build Kotlin checks, attached to `check`, plus one fixture runner.
+
+The first reads each module's declared dependencies in `afterEvaluate`, across both the `compileClasspath` and `runtimeClasspath` hierarchies, and fails when a project dependency leaves the module's edge row, naming the module and the dependency. It also fails when `core` declares Spring or JavaFX. External libraries are judged in `core` alone, for those two families, because the other modules legitimately declare libraries. Platform declarations are filtered before the rule sees them.
+
+The second inspects each module's resolved `runtimeClasspath` and fails when a JavaFX artifact appears on it. The client is the one module allowed to carry JavaFX, because the declared stack puts it there; the rule refuses JavaFX on every other module's runtime classpath.
+
+Test scope is not read: the checks cover the main source sets, so a forbidden module edge declared as `testImplementation` passes today.
+
+The messages name the offending module and dependency. No third-party rule plugin.
+
+**The fixture convention.** Plain data lists holding either a violation and the message its refusal must carry, or a permitted declaration with no expectation; one runner; one root task attached to the root `check`. A fixture proves the rule classes, and end-to-end probes in the `dependency-checks` deviation report prove the wiring from real declarations and resolved classpaths.
 
 **Version and additivity.** `0.1.0` lives in one property, and an annotated git tag marks each release. A committed snapshot holds every exported package of `contract`; `check` compares the current surface against it and fails when an exported type or member disappears or changes shape, naming what changed. Because 0.1 exports almost nothing, a committed fixture reproduces a removal so the check's failure path is proven. The snapshot covers `contract` only at 0.1.
 

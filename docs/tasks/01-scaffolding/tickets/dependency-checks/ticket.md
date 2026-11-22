@@ -25,3 +25,9 @@ The build refuses a dependency that leaves the edge table, Spring or JavaFX in t
 ## Blocked by
 
 - `declared-stack`
+
+## Implementation notes
+
+The three task names are `verifyModuleDependencies` and `verifyNoJavaFxOnRuntimeClasspath`, each per module and attached to that module's `check`, and `verifyDependencyRuleFixtures` at the root, attached to the root `check`. `moduleRowsCarryingJavaFx = setOf("client")`: the runtime classpath check refuses JavaFX everywhere except the client, because the declared stack puts JavaFX there and the literal rule would fail the real build. The architecture's gates paragraph now states the same scope.
+
+The edge rule compares project dependencies only; external libraries are judged in `core` alone, for the Spring and JavaFX families, and platform declarations are filtered. The edge table is a data copy in the root build (`moduleEdgeRows`), so it must be updated with the architecture. A subproject with no row fails at configuration time, before any task runs. Test scope is not read at all: `core` with `testImplementation(project(":cli"))` stays green, which is a gap the edge table does not cover yet.
