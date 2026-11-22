@@ -5,6 +5,7 @@
 import java.io.File
 import java.lang.module.ModuleDescriptor
 import java.lang.module.ModuleFinder
+import java.util.zip.ZipFile
 import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.api.attributes.Category
@@ -71,6 +72,11 @@ fun qualifiedNameOf(module: String): String = "$packageRoot.$module"
 // descriptor. One set, so the classpath module is not a special case anywhere
 // else in this script.
 val modulesOnTheClasspath: Set<String> = setOf("api")
+
+// The client's descriptor must export the package that holds its `Application`
+// subclass, or JavaFX cannot construct it from the image. A placeholder type
+// stands in for that subclass until the client-image ticket replaces it.
+val clientApplicationClass = "$packageRoot.client.WorkthreadApplication"
 
 // The declared stack puts JavaFX in the client alone. The runtime only warns
 // when JavaFX sits on the classpath, so the build refuses a JavaFX artifact
@@ -176,6 +182,7 @@ subprojects {
         expectedModuleName.set(if (project.name in modulesOnTheClasspath) "" else qualifiedNameOf(project.name))
         expectedPackage.set(qualifiedNameOf(project.name))
         allowedModuleNames.set(edgeRow.map { dependency -> qualifiedNameOf(dependency) })
+        applicationClass.set(clientApplicationClass.takeIf { project.name == "client" }.orEmpty())
         descriptorJar.set(tasks.named<Jar>("jar").flatMap { jar -> jar.archiveFile })
     }
     tasks.named("check") { dependsOn("verifyModuleDescriptor") }
@@ -427,6 +434,7 @@ class ModuleDescriptorRule(
     private val expectedModuleName: String?,
     private val expectedPackage: String,
     private val allowedModuleNames: List<String>,
+    private val applicationClass: String?,
     private val jar: File,
 ) : DependencyRule() {
 
@@ -456,8 +464,20 @@ class ModuleDescriptorRule(
         if (expectedPackage !in exportedPackages(descriptor)) {
             violations.add("$module does not export $expectedPackage; its descriptor must export the package its public types live in")
         }
+        if (applicationClass != null) {
+            val applicationPackage = applicationClass.substringBeforeLast('.')
+            if (!jarContains(applicationClass)) {
+                violations.add("$module's jar holds no $applicationClass, and that class is the one its exported package must be able to hold")
+            }
+            if (applicationPackage !in exportedPackages(descriptor)) {
+                violations.add("$module does not export $applicationPackage, which holds its application class; a class in a package a module keeps to itself cannot be constructed")
+            }
+        }
         return violations
     }
+
+    private fun jarContains(type: String): Boolean =
+        ZipFile(jar).use { archive -> archive.getEntry(type.replace('.', '/') + ".class") != null }
 
     // A `requires` of a JDK module (`java.logging`) is not an edge in the
     // architecture's table, so the rule judges only the modules of this build.
@@ -493,6 +513,9 @@ abstract class VerifyModuleDescriptor : DefaultTask() {
     @get:Input
     abstract val allowedModuleNames: ListProperty<String>
 
+    @get:Input
+    abstract val applicationClass: Property<String>
+
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val descriptorJar: RegularFileProperty
@@ -504,6 +527,7 @@ abstract class VerifyModuleDescriptor : DefaultTask() {
             expectedModuleName = expectedModuleName.get().ifEmpty { null },
             expectedPackage = expectedPackage.get(),
             allowedModuleNames = allowedModuleNames.get(),
+            applicationClass = applicationClass.get().ifEmpty { null },
             jar = descriptorJar.get().asFile,
         ).verify()
     }
