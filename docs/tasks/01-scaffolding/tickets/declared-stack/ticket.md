@@ -26,3 +26,11 @@ Each module declares its real dependency set at the pinned versions, and the who
 ## Blocked by
 
 - `walking-skeleton`
+
+## Implementation notes
+
+The recorded command is `./gradlew -q printPinnedModuleNames`. It prints module, module name, shape, and jar as a tab-separated table over `testRuntimeClasspath`, read with `ModuleFinder` rather than inferred from a POM, and it reproduces on the merge target.
+
+Three corrections to the `dependency-pins` notes, confirmed from the jars: `assertj-core` 3.27.7 is named `org.assertj.core`, `jackson-annotations` 2.21 is named `com.fasterxml.jackson.annotation`, and `reactor-core` 3.7.0 plus `spring-boot` 4.2.0 are automatic. `api` resolves `jackson-annotations` 2.21, not 2.21.8, and `mcp` resolves `slf4j-api` 2.0.17 against `api`'s 2.0.20.
+
+`api` declares `spring-boot-starter-webmvc` as its first versionless Spring Boot artifact, so the platform's effect is observable; swapping the starter is a one-line change. `api` holds JUnit 5 with `enforcedPlatform(libs.junit.bom)` on `testImplementation`, because both a soft `platform()` and an explicit versioned Jupiter dependency lose to the platform's 6.1.3 constraint. `CoreStackTest` and `ContractStackTest` are scoping regression guards with no red state, and the classpath-reading helper is duplicated per module on purpose: sharing it would need a test-fixtures source set on `contract`.

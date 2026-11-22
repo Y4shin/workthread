@@ -39,12 +39,16 @@ No surface module depends on another surface module. A new module requires an ar
 
 JavaFX 21.0.13 in `client`, through the JavaFX Gradle plugin 0.1.0, which supplies the host's platform classifier. Spring Boot 4.2.0 in `api`, brought in with the dependency platform only: no Spring Boot plugin and no dependency-management plugin, because the BOM alone is enough and the management plugin would override the store driver version. The MCP SDK 2.1.0 aggregator in `mcp`, with the JSON mapper supplied explicitly. sqlite-jdbc 3.54.1.0 in `adapters`. JUnit 5.14.4 and AssertJ 3.27.7 for tests. `org.beryx.jlink` 4.2.0 for packaging.
 
-Four version facts hold the list together:
+Six facts hold the list together:
 
 - JavaFX stays on 21.0.13. The 21.0.13.1 re-spin changes only `javafx.web`, which the client never loads.
 - The MCP SDK's `mcp` jar is a named module, but its payload jars `mcp-core` and `mcp-json-jackson3` are automatic modules. `jlink` refuses automatic modules, so no image can contain the MCP surface.
-- Spring Boot's BOM manages JUnit 6.1.3 and sqlite-jdbc 3.53.4.0, so it is applied only in `api`, where JUnit 5 is declared explicitly.
+- Spring Boot's BOM manages JUnit 6.1.3 and sqlite-jdbc 3.53.4.0, so it is applied only in `api`. `api` holds JUnit 5 with `testImplementation(enforcedPlatform(libs.junit.bom))`, because both a soft `platform()` and an explicitly versioned Jupiter dependency lose to the platform's 6.1.3 constraint. `enforcedPlatform` is Gradle's own model, not a dependency-management plugin.
+- `api` declares `spring-boot-starter-webmvc` as its one versionless Spring Boot artifact, so the platform's effect is observable and the servlet stack is what the module resolves. This follows the repository's existing MockMvc convention and settles servlet over reactive for the API effort. Swapping the starter is a one-line change.
 - Jackson 2 versus 3 is settled: both sides use Jackson 3 (`tools.jackson` 3.1.8 from Spring Boot, 3.1.4 from the MCP SDK, resolved upward), both reuse the 2.21 annotations artifact, and no exclusion is needed. `api` never sees the MCP SDK, because surface modules never depend on each other.
+- The module names are confirmed from the resolved jars, not from the notes: `javafx.base`, `javafx.controls`, `javafx.graphics`, `io.modelcontextprotocol.sdk.mcp`, `com.networknt.schema`, `org.xerial.sqlitejdbc`, `org.junit.jupiter.api`, `tools.jackson.databind`, `org.slf4`. `assertj-core` 3.27.7 is named `org.assertj.core` and `jackson-annotations` 2.21 is named `com.fasterxml.jackson.annotation`, so neither is automatic. `reactor-core` and `spring-boot` are automatic. `./gradlew -q printPinnedModuleNames` reprints the table from the resolved jars with `ModuleFinder`.
+
+No module holds a type yet: each main package is declared by a `package-info.java` only. A descriptor cannot export a package that holds no type, so a module gains its first type before its `exports` clause exists.
 
 ## The build's own gates
 
