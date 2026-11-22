@@ -3,6 +3,7 @@
 // architecture's edge table is readable in one place per module.
 
 import java.io.File
+import java.lang.module.ModuleDescriptor
 import java.lang.module.ModuleFinder
 import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.artifacts.VersionCatalogsExtension
@@ -445,8 +446,31 @@ class ModuleDescriptorRule(
         if (descriptor.name() != expectedModuleName) {
             violations.add("$module's jar reports the module name ${descriptor.name()}, and its descriptor must declare $expectedModuleName")
         }
+        val required = projectModulesRequiredBy(descriptor)
+        required.filterNot { name -> name in allowedModuleNames }.forEach { name ->
+            violations.add("$module requires $name, which its edge row does not allow; the row allows ${row()}")
+        }
+        allowedModuleNames.filterNot { name -> name in required }.forEach { name ->
+            violations.add("$module does not require $name, and its edge row names it")
+        }
+        if (expectedPackage !in exportedPackages(descriptor)) {
+            violations.add("$module does not export $expectedPackage; its descriptor must export the package its public types live in")
+        }
         return violations
     }
+
+    // A `requires` of a JDK module (`java.logging`) is not an edge in the
+    // architecture's table, so the rule judges only the modules of this build.
+    private fun projectModulesRequiredBy(descriptor: ModuleDescriptor): List<String> =
+        descriptor.requires()
+            .map { requires -> requires.name() }
+            .filterNot { name -> ModuleFinder.ofSystem().find(name).isPresent }
+            .sorted()
+
+    private fun exportedPackages(descriptor: ModuleDescriptor): List<String> =
+        descriptor.exports().map { exported -> exported.source() }
+
+    private fun row(): String = if (allowedModuleNames.isEmpty()) "nothing" else allowedModuleNames.joinToString(separator = ", ")
 
     // An automatic module is derived from a jar's name, not declared, so it does
     // not count as a descriptor a reader can read the exports from.
