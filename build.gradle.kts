@@ -441,7 +441,11 @@ class ModuleDescriptorRule(
         if (descriptor == null) {
             return listOf("$module's jar carries no module descriptor; $expectedModuleName is a named module")
         }
-        return listOf()
+        val violations = mutableListOf<String>()
+        if (descriptor.name() != expectedModuleName) {
+            violations.add("$module's jar reports the module name ${descriptor.name()}, and its descriptor must declare $expectedModuleName")
+        }
+        return violations
     }
 
     // An automatic module is derived from a jar's name, not declared, so it does
