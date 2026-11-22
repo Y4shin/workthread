@@ -7,6 +7,15 @@ title: Task Changelog
 
 
 
+
+## 2026-11-22, Make the seven modules named Java modules (named-modules)
+
+The seven modules that reach the image are now named Java modules. Each carries a `module-info.java` under `io.github.y4shin.workthread.<module>`, requires exactly its edge row, and exports its package; `api` stays on the classpath with no descriptor.
+
+Decisions: the module name is the package name, derived once from `packageRoot` in the root build, so the name and the single export cannot drift. Each module carries one placeholder type, because a descriptor cannot export an empty package; the client's is `WorkthreadApplication`, the stand-in the image ticket replaces in place.
+
+Outcome: `./gradlew clean build` is green with 66 executed tasks and the configuration cache reused, and each built jar reports its expected module name.
+
 ## 2026-11-22, Enforce the dependency rules in the build (dependency-checks)
 
 The build now refuses a dependency that leaves the architecture's edge table, Spring or JavaFX in `core`, and a JavaFX artifact on any runtime classpath other than the client's. Each refusal names the module, the dependency, and the allowed row.
