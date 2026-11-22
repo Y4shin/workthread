@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: "Walking skeleton: wrapper, eight subprojects, green build"
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: m
 ---
