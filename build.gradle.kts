@@ -20,6 +20,10 @@ val assertjCore = catalog.findLibrary("assertj-core").get()
 subprojects {
     apply(plugin = "java-library")
 
+    // One source: the group and version properties in gradle.properties.
+    group = rootProject.group
+    version = rootProject.version
+
     configure<JavaPluginExtension> {
         toolchain {
             languageVersion = JavaLanguageVersion.of(21)
