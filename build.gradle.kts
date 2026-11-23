@@ -1318,3 +1318,471 @@ tasks.register("verifyVersionAndSurfaceFixtures") {
 }
 
 tasks.named("check") { dependsOn("verifyVersionAndSurfaceFixtures") }
+
+// ---------------------------------------------------------------------------
+// The pipeline: `.github/workflows/ci.yml` is the pipeline, so the check reads
+// it as the committed file rather than trusting a description of it.
+// ---------------------------------------------------------------------------
+
+/**
+ * The pipeline's shape, read from the committed workflow file: three pinned
+ * legs, an explicit JDK, the build, the client image task, the uploaded images,
+ * and the run policy that keeps a superseded run from burning minutes. The
+ * architecture's CI section is the source of every refusal, and a refusal names
+ * what the workflow must carry.
+ *
+ * A comment is not a step: the body is read with its comments removed, so the
+ * workflow can say why it needs no display without the check reading that
+ * sentence as a step.
+ */
+class CiPipelineRule(
+    private val path: String,
+    private val lines: List<String>?,
+) : DependencyRule() {
+
+    override fun violations(): List<String> {
+        if (lines == null) {
+            return listOf("$path is missing; the pipeline is a committed workflow file, and three legs build from it")
+        }
+        val body = bodyOf(lines)
+        val violations = mutableListOf<String>()
+        checkRunnerLabels(body, violations)
+        checkToolchain(body, violations)
+        checkPipelineSteps(body, violations)
+        checkUploadedImages(body, violations)
+        checkRunPolicy(body, violations)
+        return violations
+    }
+
+    private fun checkRunnerLabels(body: List<String>, violations: MutableList<String>) {
+        val legs = RUNNER_LABELS.joinToString(separator = ", ")
+        RUNNER_LABELS.filterNot { label -> body.any { line -> line.contains(label) } }.forEach { label ->
+            violations.add("the pipeline's matrix carries no $label; the three legs are $legs, pinned to exact labels")
+        }
+        if (body.none { line -> line.contains("runs-on: \${{ matrix.os }}") }) {
+            violations.add("the pipeline's job runs on no matrix label; the three labels are three hosts only if the job runs on them")
+        }
+        body.forEach { line ->
+            FLOATING_RUNNER_LABEL.find(line)?.let { floating ->
+                violations.add("the pipeline runs on ${floating.value}; a -latest label moves the OS baseline, and the JavaFX classifier with it")
+            }
+        }
+    }
+
+    /**
+     * The JDK the leg builds with, and the Gradle user home the next run restores.
+     * The patch is pinned, not the major version: `jlink` links the JDK's own
+     * modules, so a floating patch links a different image on each leg.
+     */
+    private fun checkToolchain(body: List<String>, violations: MutableList<String>) {
+        val javaStep = stepLines(body, "actions/setup-java")
+        if (javaStep == null) {
+            violations.add("the pipeline sets up no JDK; ubuntu and windows default to Java 17, and jlink links the JDK the leg runs")
+        } else {
+            if (javaStep.none { line -> line.contains("distribution: temurin") }) {
+                violations.add("the pipeline's JDK step names no Temurin distribution; the image is linked from that JDK")
+            }
+            if (javaStep.none { line -> PINNED_JDK.containsMatchIn(line) }) {
+                violations.add("the pipeline's JDK step names no 21.0.13; an unpinned patch links a different image on each leg")
+            }
+        }
+        if (body.none { line -> line.contains("gradle/actions/setup-gradle") }) {
+            violations.add(
+                "the pipeline uses no gradle/actions/setup-gradle; " +
+                    "it validates the wrapper and restores the Gradle user home, so a wrapper-validation step of its own is redundant",
+            )
+        }
+    }
+
+    /**
+     * The two commands every leg runs: the build, which carries every check, and
+     * the client's image task, which is the packaging artifact.
+     */
+    private fun checkPipelineSteps(body: List<String>, violations: MutableList<String>) {
+        if (body.none { line -> line.contains("./gradlew build") }) {
+            violations.add("the pipeline runs no ./gradlew build; the build is the gate every leg meets, and every check rides it")
+        }
+        if (body.none { line -> line.contains(":client:jlink") }) {
+            violations.add("the pipeline runs no ./gradlew :client:jlink; each leg builds its own image, and nothing cross-builds")
+        }
+    }
+
+    /**
+     * The image, uploaded per leg and kept for a week. A delivered artifact loses
+     * its permissions, so it is evidence for inspection and for the manual launch
+     * check, not the shipped image; three images per run still run out the storage
+     * allowance, which is what the short retention is for.
+     */
+    private fun checkUploadedImages(body: List<String>, violations: MutableList<String>) {
+        val upload = stepLines(body, "actions/upload-artifact")
+        if (upload == null) {
+            violations.add("the pipeline uploads no image; the three artifacts are what the manual launch checks download")
+            return
+        }
+        if (upload.none { line -> line.contains("path: client/build/image") }) {
+            violations.add("the artifact upload does not point at client/build/image; that directory is the image")
+        }
+        if (upload.none { line -> line.contains("retention-days: 7") }) {
+            violations.add("the artifact upload keeps no seven days; three images per run exhaust the free storage otherwise")
+        }
+        if (upload.none { line -> line.contains("name: image-") && line.contains("matrix.os") }) {
+            violations.add("the artifact upload names no per-leg artifact; three legs with one name upload one artifact")
+        }
+        if (upload.none { line -> line.contains("if-no-files-found: error") }) {
+            violations.add("the artifact upload tolerates a missing image; if-no-files-found: error fails the leg instead of shipping nothing")
+        }
+    }
+
+    /**
+     * When the pipeline runs, what it is allowed to do, and what happens to a run
+     * a newer commit supersedes. Read-only permissions are the default a pipeline
+     * should have to argue its way out of, and a superseded run that keeps
+     * running burns minutes for a result nobody will read.
+     */
+    private fun checkRunPolicy(body: List<String>, violations: MutableList<String>) {
+        if (body.none { line -> line.contains("pull_request:") }) {
+            violations.add("the pipeline is not triggered by a pull request")
+        }
+        if (body.none { line -> line.trim() == "push:" } || body.none { line -> line.contains("branches:") && line.contains("main") }) {
+            violations.add("the pipeline is not triggered by a push to main")
+        }
+        if (body.none { line -> line.contains("workflow_dispatch:") }) {
+            violations.add("the pipeline is not triggered by workflow_dispatch; a rerun must be possible without a commit")
+        }
+        if (body.none { line -> line.trim() == "concurrency:" }) {
+            violations.add("the pipeline has no concurrency group; a superseded run keeps burning runner minutes")
+        } else if (body.none { line -> line.contains("cancel-in-progress: true") }) {
+            violations.add("the pipeline's concurrency group does not set cancel-in-progress: true; a superseded run keeps burning runner minutes")
+        }
+        if (body.none { line -> line.contains("contents: read") } || body.any { line -> WRITE_PERMISSION.containsMatchIn(line) }) {
+            violations.add("the pipeline's permissions are not read-only; the build needs contents: read and nothing more")
+        }
+    }
+
+    /** The workflow's lines with their comments removed, so a sentence is not a step. */
+    private fun bodyOf(lines: List<String>): List<String> =
+        lines.map { line -> line.substringBefore('#').trimEnd() }.filter { line -> line.isNotEmpty() }
+
+    /**
+     * One step of the workflow: the line that names the action and the lines
+     * indented under it. A step ends where the next line indents no deeper, which
+     * is where the next step begins.
+     */
+    private fun stepLines(body: List<String>, action: String): List<String>? {
+        val start = body.indexOfFirst { line -> line.contains(action) }
+        if (start < 0) {
+            return null
+        }
+        val indent = indentOf(body[start])
+        val end = (start + 1 until body.size).firstOrNull { index -> indentOf(body[index]) <= indent } ?: body.size
+        return body.subList(start, end)
+    }
+
+    private fun indentOf(line: String): Int = line.length - line.trimStart().length
+
+    companion object {
+        const val PATH = ".github/workflows/ci.yml"
+        val RUNNER_LABELS = listOf("ubuntu-24.04", "macos-26", "windows-2025")
+        val FLOATING_RUNNER_LABEL = Regex("(ubuntu|macos|windows)-latest")
+        val PINNED_JDK = Regex("java-version:\\s*['\"]?21\\.0\\.13['\"]?")
+        val WRITE_PERMISSION = Regex("permissions:\\s*write|:\\s*write")
+    }
+}
+
+/**
+ * The prerequisites the pipeline must not need. Nothing in the pipeline launches
+ * the client: the build links the image, the checks are toolkit-free, and the
+ * launch happens by hand. Xvfb, GTK, and jpackage would only appear if something
+ * started a toolkit or built an installer.
+ *
+ * A comment is not a step, so the workflow can say why it needs none of them
+ * without this rule reading that sentence as a step.
+ */
+class ForbiddenCiStepRule(private val lines: List<String>?) : DependencyRule() {
+
+    override fun violations(): List<String> {
+        // A missing workflow is the pipeline rule's refusal, and there is nothing
+        // here to read.
+        val body = (lines ?: listOf())
+            .map { line -> line.substringBefore('#').trimEnd() }
+            .filter { line -> line.isNotEmpty() }
+        return FORBIDDEN_STEPS
+            .filter { (token, _) -> body.any { line -> line.contains(token, ignoreCase = true) } }
+            .map { (_, reason) -> "the pipeline $reason" }
+    }
+
+    companion object {
+        // Each token names the tool and the reason it does not belong. `wix` is
+        // the Windows installer toolchain, `fakeroot` and `dpkg-deb` the Linux
+        // one: all three serve jpackage, and the pipeline builds an image.
+        val FORBIDDEN_STEPS = listOf(
+            "xvfb" to "uses xvfb; nothing in the pipeline launches a toolkit, so a display is not needed",
+            "gtk" to "installs GTK; JavaFX needs it only when the toolkit initialises, and nothing in the pipeline launches",
+            "jpackage" to "uses jpackage; the jlink image is the shipping artifact and the pipeline builds no installer",
+            "fakeroot" to "provisions fakeroot; that is a jpackage installer prerequisite, and the pipeline builds an image",
+            "dpkg-deb" to "provisions dpkg-deb; that is a jpackage installer prerequisite, and the pipeline builds an image",
+            "wix" to "provisions wix; that is a jpackage installer prerequisite, and the pipeline builds an image",
+        )
+    }
+}
+
+/** The committed workflow file, checked as the pipeline it declares. */
+abstract class VerifyCiWorkflow : DefaultTask() {
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val workflow: ConfigurableFileCollection
+
+    @TaskAction
+    fun verifyPipeline() {
+        val file = workflow.files.singleOrNull()
+        val lines = file?.takeIf { existing -> existing.exists() }?.readLines()
+        CiPipelineRule(path = CiPipelineRule.PATH, lines = lines).verify()
+        ForbiddenCiStepRule(lines = lines).verify()
+    }
+}
+
+// The workflow is the pipeline's only committed artifact, so the check reads it
+// from the root project: a leg runs `./gradlew build`, and this check rides it.
+val ciWorkflow = rootProject.file(CiPipelineRule.PATH)
+
+tasks.register<VerifyCiWorkflow>("verifyCiWorkflow") {
+    group = "verification"
+    description = "Refuses a workflow file that drops a pinned leg, a floating runner label, an explicit JDK, the build, the image task, or the uploaded images."
+    workflow.from(ciWorkflow)
+}
+tasks.named("check") { dependsOn("verifyCiWorkflow") }
+
+/**
+ * A workflow fragment and the refusal it must produce. The accepted side of the
+ * pipeline rule is the committed file itself, which `verifyCiWorkflow` reads: a
+ * fragment cannot stand in for a whole pipeline, and a second copy of the real
+ * workflow in the build script would drift from it.
+ */
+class CiPipelineFixture(
+    val what: String,
+    val lines: List<String>,
+    val expectedRefusal: String,
+)
+
+// Each fixture is one way the pipeline can stop keeping the promise. The
+// fragments are short on purpose: the rule names every violation it finds, so a
+// fragment reports the one under test among the ones its shortness causes.
+val ciPipelineFixtures = listOf(
+    CiPipelineFixture(
+        what = "a leg is missing",
+        lines = listOf("        os: [ubuntu-24.04, windows-2025]"),
+        expectedRefusal = "the pipeline's matrix carries no macos-26; " +
+            "the three legs are ubuntu-24.04, macos-26, windows-2025, pinned to exact labels",
+    ),
+    CiPipelineFixture(
+        what = "a floating runner label",
+        lines = listOf("    runs-on: ubuntu-latest"),
+        expectedRefusal = "the pipeline runs on ubuntu-latest; a -latest label moves the OS baseline, and the JavaFX classifier with it",
+    ),
+    CiPipelineFixture(
+        what = "no JDK step",
+        lines = listOf("      - uses: actions/checkout@v7"),
+        expectedRefusal = "the pipeline sets up no JDK; ubuntu and windows default to Java 17, and jlink links the JDK the leg runs",
+    ),
+    CiPipelineFixture(
+        what = "an unpinned JDK patch",
+        lines = listOf(
+            "      - uses: actions/setup-java@v6",
+            "        with:",
+            "          distribution: temurin",
+            "          java-version: '21'",
+        ),
+        expectedRefusal = "the pipeline's JDK step names no 21.0.13; an unpinned patch links a different image on each leg",
+    ),
+    CiPipelineFixture(
+        what = "no Gradle setup step",
+        lines = listOf(
+            "      - uses: actions/setup-java@v6",
+            "        with:",
+            "          distribution: temurin",
+            "          java-version: '21.0.13'",
+        ),
+        expectedRefusal = "the pipeline uses no gradle/actions/setup-gradle; " +
+            "it validates the wrapper and restores the Gradle user home, so a wrapper-validation step of its own is redundant",
+    ),
+    CiPipelineFixture(
+        what = "no build step",
+        lines = listOf("      - uses: actions/checkout@v7"),
+        expectedRefusal = "the pipeline runs no ./gradlew build; the build is the gate every leg meets, and every check rides it",
+    ),
+    CiPipelineFixture(
+        what = "no client image task",
+        lines = listOf("      - run: ./gradlew build"),
+        expectedRefusal = "the pipeline runs no ./gradlew :client:jlink; each leg builds its own image, and nothing cross-builds",
+    ),
+    CiPipelineFixture(
+        what = "no artifact upload",
+        lines = listOf("      - run: ./gradlew build", "      - run: ./gradlew :client:jlink"),
+        expectedRefusal = "the pipeline uploads no image; the three artifacts are what the manual launch checks download",
+    ),
+    CiPipelineFixture(
+        what = "the artifact upload points at another directory",
+        lines = listOf(
+            "      - uses: actions/upload-artifact@v7",
+            "        with:",
+            "          name: image-\${{ matrix.os }}",
+            "          path: client/build/libs/",
+            "          retention-days: 7",
+            "          if-no-files-found: error",
+        ),
+        expectedRefusal = "the artifact upload does not point at client/build/image; that directory is the image",
+    ),
+    CiPipelineFixture(
+        what = "the artifacts are kept for ninety days",
+        lines = listOf(
+            "      - uses: actions/upload-artifact@v7",
+            "        with:",
+            "          name: image-\${{ matrix.os }}",
+            "          path: client/build/image/",
+            "          retention-days: 90",
+            "          if-no-files-found: error",
+        ),
+        expectedRefusal = "the artifact upload keeps no seven days; three images per run exhaust the free storage otherwise",
+    ),
+    CiPipelineFixture(
+        what = "three legs upload one artifact name",
+        lines = listOf(
+            "      - uses: actions/upload-artifact@v7",
+            "        with:",
+            "          name: image",
+            "          path: client/build/image/",
+            "          retention-days: 7",
+            "          if-no-files-found: error",
+        ),
+        expectedRefusal = "the artifact upload names no per-leg artifact; three legs with one name upload one artifact",
+    ),
+    CiPipelineFixture(
+        what = "the upload tolerates a missing image",
+        lines = listOf(
+            "      - uses: actions/upload-artifact@v7",
+            "        with:",
+            "          name: image-\${{ matrix.os }}",
+            "          path: client/build/image/",
+            "          retention-days: 7",
+            "          if-no-files-found: warn",
+        ),
+        expectedRefusal = "the artifact upload tolerates a missing image; if-no-files-found: error fails the leg instead of shipping nothing",
+    ),
+    CiPipelineFixture(
+        what = "no pull request trigger",
+        lines = listOf("on:", "  push:", "    branches: [main]", "  workflow_dispatch:"),
+        expectedRefusal = "the pipeline is not triggered by a pull request",
+    ),
+    CiPipelineFixture(
+        what = "no push to the main branch",
+        lines = listOf("on:", "  pull_request:", "  workflow_dispatch:"),
+        expectedRefusal = "the pipeline is not triggered by a push to main",
+    ),
+    CiPipelineFixture(
+        what = "no manual dispatch",
+        lines = listOf("on:", "  push:", "    branches: [main]", "  pull_request:"),
+        expectedRefusal = "the pipeline is not triggered by workflow_dispatch; a rerun must be possible without a commit",
+    ),
+    CiPipelineFixture(
+        what = "no concurrency group",
+        lines = listOf("permissions:", "  contents: read"),
+        expectedRefusal = "the pipeline has no concurrency group; a superseded run keeps burning runner minutes",
+    ),
+    CiPipelineFixture(
+        what = "a superseded run is not cancelled",
+        lines = listOf(
+            "concurrency:",
+            "  group: \${{ github.workflow }}-\${{ github.ref }}",
+            "  cancel-in-progress: false",
+        ),
+        expectedRefusal = "the pipeline's concurrency group does not set cancel-in-progress: true; a superseded run keeps burning runner minutes",
+    ),
+    CiPipelineFixture(
+        what = "the permissions are not read-only",
+        lines = listOf("permissions: write-all"),
+        expectedRefusal = "the pipeline's permissions are not read-only; the build needs contents: read and nothing more",
+    ),
+)
+
+/**
+ * A workflow fragment and the refusal it must produce, or null when the fragment
+ * is permitted. The comment case is the permitted one: the workflow may say why
+ * it needs no display, and a sentence is not a step.
+ */
+class ForbiddenCiStepFixture(
+    val what: String,
+    val lines: List<String>,
+    val expectedRefusal: String?,
+)
+
+val forbiddenCiStepFixtures = listOf(
+    ForbiddenCiStepFixture(
+        what = "a display server is installed",
+        lines = listOf("      - run: sudo apt-get install -y xvfb"),
+        expectedRefusal = "the pipeline uses xvfb; nothing in the pipeline launches a toolkit, so a display is not needed",
+    ),
+    ForbiddenCiStepFixture(
+        what = "the GTK libraries are installed",
+        lines = listOf("      - run: sudo apt-get install -y libgtk-3-0"),
+        expectedRefusal = "the pipeline installs GTK; JavaFX needs it only when the toolkit initialises, and nothing in the pipeline launches",
+    ),
+    ForbiddenCiStepFixture(
+        what = "an installer is built",
+        lines = listOf("      - run: jpackage --type deb --input client/build/image"),
+        expectedRefusal = "the pipeline uses jpackage; the jlink image is the shipping artifact and the pipeline builds no installer",
+    ),
+    ForbiddenCiStepFixture(
+        what = "an installer prerequisite is provisioned",
+        lines = listOf("      - run: sudo apt-get install -y fakeroot dpkg-deb"),
+        expectedRefusal = "the pipeline provisions fakeroot; that is a jpackage installer prerequisite, and the pipeline builds an image",
+    ),
+    ForbiddenCiStepFixture(
+        what = "a comment names the steps the pipeline does not run",
+        lines = listOf(
+            "# Nothing here starts a toolkit: no Xvfb, no GTK, no jpackage.",
+            "      - uses: actions/checkout@v7",
+        ),
+        expectedRefusal = null,
+    ),
+)
+
+/** Runs the pipeline fixtures and reports the ones whose rule did not answer as the fixture says. */
+class CiWorkflowFixtures(
+    private val ciPipelineFixtures: List<CiPipelineFixture>,
+    private val forbiddenCiStepFixtures: List<ForbiddenCiStepFixture>,
+) : FixtureChecks() {
+
+    fun count(): Int = ciPipelineFixtures.size + forbiddenCiStepFixtures.size
+
+    fun problems(): List<String> {
+        val problems = mutableListOf<String>()
+        ciPipelineFixtures.forEach { fixture ->
+            val refusal = refusalOf(CiPipelineRule(path = CiPipelineRule.PATH, lines = fixture.lines))
+            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        forbiddenCiStepFixtures.forEach { fixture ->
+            val refusal = refusalOf(ForbiddenCiStepRule(lines = fixture.lines))
+            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        return problems
+    }
+}
+
+tasks.register("verifyCiWorkflowFixtures") {
+    group = "verification"
+    description = "Proves the pipeline rules refuse a dropped leg, a floating label, an unpinned JDK, a missing image upload, or a display step, with messages that name them."
+    // Plain data, so the action needs no reference to the build script itself.
+    val fixtures = CiWorkflowFixtures(ciPipelineFixtures, forbiddenCiStepFixtures)
+    doLast {
+        val problems = fixtures.problems()
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "The workflow fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
+            )
+        }
+        println("${fixtures.count()} workflow fixtures held")
+    }
+}
+
+tasks.named("check") { dependsOn("verifyCiWorkflowFixtures") }
