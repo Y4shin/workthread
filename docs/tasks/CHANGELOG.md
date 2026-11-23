@@ -10,6 +10,15 @@ title: Task Changelog
 
 
 
+
+## 2026-11-23, Build and package on three platforms in CI (three-platform-ci)
+
+`.github/workflows/ci.yml` builds and packages on `ubuntu-24.04`, `macos-26`, and `windows-2025`. Each leg sets up Temurin 21.0.13, lets `gradle/actions/setup-gradle` restore the Gradle home and validate the wrapper, runs `./gradlew build` and `./gradlew :client:jlink`, then uploads the image as an artifact kept seven days.
+
+Decisions: `fail-fast: false`, so one red leg does not hide the other two; read-only permissions, confirmed enough by the first run's upload; superseded runs cancelled by a concurrency group; no Xvfb, GTK, or jpackage step, because nothing launches. A root check now reads the workflow and refuses a label, JDK patch, artifact, or concurrency drift from the design, and the file is therefore checked as text.
+
+Outcome: the first run is green on all three legs (run 45089591551 on pull request 1) and uploads three images: 43 971 538 bytes on Ubuntu, 41 442 989 on Windows, 39 563 002 on macOS.
+
 ## 2026-11-23, Start 0.1.0 and the contract API snapshot (version-and-api-snapshot)
 
 The version is 0.1.0 from one property, and three enforcers read it: every jar carries it in its manifest, the client's window label renders it from a generated resource, and `verifyVersion` refuses a jar or a source file that reports another number. `check` now compares `contract`'s exported surface against a committed snapshot.
