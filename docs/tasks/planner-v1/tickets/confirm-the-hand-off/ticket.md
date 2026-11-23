@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Confirm the planner v1 hand-off
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: s
 mode: human
@@ -46,3 +46,7 @@ the children exist and that the record behind them is trustworthy.
 
 None (can start immediately). It waits on the child efforts existing, not on
 another ticket.
+
+## Implementation notes
+
+Closing check run on `effort/planner-v1` in human mode. All six acceptance criteria were verified against the tree: twelve numbered child efforts with `origin_effort: planner-v1`; architecture `status: stable` and the archival note present in `spec.md`; contract ranges expanded and compared to the register row for row (all twelve exact); `check-requirements.py` passing on 977 kept rows; no child created as a ticket and no `blocked_by` edge between children. Criteria 2 and 3 name the child map as the holder of scope and ranges, while the maps carry `origin_effort` plus a pointer at `## Contracts per child effort` and a kept-row count. Judged satisfied on substance, with the human's explicit decision to keep one source in the contract rather than duplicating it onto twelve maps; that choice is recorded in the changelog entry.
