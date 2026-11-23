@@ -8,6 +8,15 @@ title: Task Changelog
 
 
 
+
+## 2026-11-23, Ship the empty window as a jlink image (client-image)
+
+`./gradlew :client:jlink` now builds a runtime image whose launcher opens one empty window: title `workthread`, 1024x768, one centred label reading `workthread 0.1.0`. The client's placeholder became the real JavaFX `Application` subclass, and its descriptor gained `requires javafx.controls`.
+
+Decisions: the `application` plugin joins `client` with `mainModule` and `mainClass`, because `jlink` cannot link or start a module without them; both plugin versions moved into the version catalogue.
+
+Outcome: the Linux x86_64 image measures 67 611 290 bytes, launches under a virtual display, and needs GTK3, X11, `libGL`, `libXxf86vm`, and a writable `~/.openjfx/cache`. The build stays warning-free with the configuration cache reused; `:client:assemble` also emits two distributions that nothing consumes.
+
 ## 2026-11-22, Make the seven modules named Java modules (named-modules)
 
 The seven modules that reach the image are now named Java modules. Each carries a `module-info.java` under `io.github.y4shin.workthread.<module>`, requires exactly its edge row, and exports its package; `api` stays on the classpath with no descriptor.
