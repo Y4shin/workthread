@@ -8,7 +8,6 @@ title: docs/tasks
 
 ## Live
 
-- 01-scaffolding
 - 02-work-store
 - 03-cli-basics
 - 04-cli-work-model
@@ -24,4 +23,4 @@ title: docs/tasks
 
 ## Archived
 
-(none)
+- 01-scaffolding

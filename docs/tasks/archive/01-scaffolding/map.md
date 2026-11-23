@@ -1,7 +1,7 @@
 ---
 type: map
 title: "Scaffolding: the build, eight modules, and the first shippable image"
-status: stable
+status: deprecated
 origin_effort: planner-v1
 ready_for_spec: true
 ---

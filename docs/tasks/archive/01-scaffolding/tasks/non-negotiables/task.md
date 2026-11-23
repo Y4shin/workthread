@@ -2,7 +2,7 @@
 type: task
 subtype: grilling
 title: Settle the non-goals, the non-negotiable facts, and the success test for scaffolding
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 ---

@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Enforce the dependency rules in the build
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - declared-stack

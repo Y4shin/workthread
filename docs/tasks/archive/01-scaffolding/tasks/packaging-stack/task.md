@@ -2,7 +2,7 @@
 type: task
 subtype: prototype
 title: Does org.beryx.jlink 4.2.0 build the image on Gradle 9.9.1 with JavaFX 21
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 ---

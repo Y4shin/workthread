@@ -2,7 +2,7 @@
 type: task
 subtype: research
 title: Which versions and JPMS shapes does the declared stack pin
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 ---

@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Declare the real stack and prove it resolves
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - walking-skeleton

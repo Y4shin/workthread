@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Build and package on three platforms in CI
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - dependency-checks

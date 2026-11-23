@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Record the manual launch check on each platform
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - three-platform-ci

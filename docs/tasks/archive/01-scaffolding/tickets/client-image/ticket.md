@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Ship the empty window as a jlink image
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - named-modules

@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Start 0.1.0 and the contract API snapshot
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - named-modules

@@ -2,7 +2,7 @@
 type: ticket
 subtype: feature
 title: Make the seven modules named Java modules
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by:
 - declared-stack

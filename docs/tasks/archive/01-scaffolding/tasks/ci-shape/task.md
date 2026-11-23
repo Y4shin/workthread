@@ -2,7 +2,7 @@
 type: task
 subtype: research
 title: What the three-platform GitHub Actions pipeline must contain
-status: stable
+status: deprecated
 workflow_state: done
 blocked_by: []
 ---
