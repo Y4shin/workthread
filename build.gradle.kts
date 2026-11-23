@@ -1354,29 +1354,56 @@ class CiPipelineRule(
         return violations
     }
 
+    private fun checkRunnerLabels(body: List<String>, violations: MutableList<String>) {
+        val legs = RUNNER_LABELS.joinToString(separator = ", ")
+        RUNNER_LABELS.filterNot { label -> body.any { line -> line.contains(label) } }.forEach { label ->
+            violations.add("the pipeline's matrix carries no $label; the three legs are $legs, pinned to exact labels")
+        }
+        if (body.none { line -> line.contains("runs-on: \${{ matrix.os }}") }) {
+            violations.add("the pipeline's job runs on no matrix label; the three labels are three hosts only if the job runs on them")
+        }
+        body.forEach { line ->
+            FLOATING_RUNNER_LABEL.find(line)?.let { floating ->
+                violations.add("the pipeline runs on ${floating.value}; a -latest label moves the OS baseline, and the JavaFX classifier with it")
+            }
+        }
+    }
+
     /**
-     * When the pipeline runs, what it is allowed to do, and what happens to a run
-     * a newer commit supersedes. Read-only permissions are the default a pipeline
-     * should have to argue its way out of, and a superseded run that keeps
-     * running burns minutes for a result nobody will read.
+     * The JDK the leg builds with, and the Gradle user home the next run restores.
+     * The patch is pinned, not the major version: `jlink` links the JDK's own
+     * modules, so a floating patch links a different image on each leg.
      */
-    private fun checkRunPolicy(body: List<String>, violations: MutableList<String>) {
-        if (body.none { line -> line.contains("pull_request:") }) {
-            violations.add("the pipeline is not triggered by a pull request")
+    private fun checkToolchain(body: List<String>, violations: MutableList<String>) {
+        val javaStep = stepLines(body, "actions/setup-java")
+        if (javaStep == null) {
+            violations.add("the pipeline sets up no JDK; ubuntu and windows default to Java 17, and jlink links the JDK the leg runs")
+        } else {
+            if (javaStep.none { line -> line.contains("distribution: temurin") }) {
+                violations.add("the pipeline's JDK step names no Temurin distribution; the image is linked from that JDK")
+            }
+            if (javaStep.none { line -> PINNED_JDK.containsMatchIn(line) }) {
+                violations.add("the pipeline's JDK step names no 21.0.13; an unpinned patch links a different image on each leg")
+            }
         }
-        if (body.none { line -> line.trim() == "push:" } || body.none { line -> line.contains("branches:") && line.contains("main") }) {
-            violations.add("the pipeline is not triggered by a push to main")
+        if (body.none { line -> line.contains("gradle/actions/setup-gradle") }) {
+            violations.add(
+                "the pipeline uses no gradle/actions/setup-gradle; " +
+                    "it validates the wrapper and restores the Gradle user home, so a wrapper-validation step of its own is redundant",
+            )
         }
-        if (body.none { line -> line.contains("workflow_dispatch:") }) {
-            violations.add("the pipeline is not triggered by workflow_dispatch; a rerun must be possible without a commit")
+    }
+
+    /**
+     * The two commands every leg runs: the build, which carries every check, and
+     * the client's image task, which is the packaging artifact.
+     */
+    private fun checkPipelineSteps(body: List<String>, violations: MutableList<String>) {
+        if (body.none { line -> line.contains("./gradlew build") }) {
+            violations.add("the pipeline runs no ./gradlew build; the build is the gate every leg meets, and every check rides it")
         }
-        if (body.none { line -> line.trim() == "concurrency:" }) {
-            violations.add("the pipeline has no concurrency group; a superseded run keeps burning runner minutes")
-        } else if (body.none { line -> line.contains("cancel-in-progress: true") }) {
-            violations.add("the pipeline's concurrency group does not set cancel-in-progress: true; a superseded run keeps burning runner minutes")
-        }
-        if (body.none { line -> line.contains("contents: read") } || body.any { line -> WRITE_PERMISSION.containsMatchIn(line) }) {
-            violations.add("the pipeline's permissions are not read-only; the build needs contents: read and nothing more")
+        if (body.none { line -> line.contains(":client:jlink") }) {
+            violations.add("the pipeline runs no ./gradlew :client:jlink; each leg builds its own image, and nothing cross-builds")
         }
     }
 
@@ -1407,46 +1434,34 @@ class CiPipelineRule(
     }
 
     /**
-     * The two commands every leg runs: the build, which carries every check, and
-     * the client's image task, which is the packaging artifact.
+     * When the pipeline runs, what it is allowed to do, and what happens to a run
+     * a newer commit supersedes. Read-only permissions are the default a pipeline
+     * should have to argue its way out of, and a superseded run that keeps
+     * running burns minutes for a result nobody will read.
      */
-    private fun checkPipelineSteps(body: List<String>, violations: MutableList<String>) {
-        if (body.none { line -> line.contains("./gradlew build") }) {
-            violations.add("the pipeline runs no ./gradlew build; the build is the gate every leg meets, and every check rides it")
+    private fun checkRunPolicy(body: List<String>, violations: MutableList<String>) {
+        if (body.none { line -> line.contains("pull_request:") }) {
+            violations.add("the pipeline is not triggered by a pull request")
         }
-        if (body.none { line -> line.contains(":client:jlink") }) {
-            violations.add("the pipeline runs no ./gradlew :client:jlink; each leg builds its own image, and nothing cross-builds")
+        if (body.none { line -> line.trim() == "push:" } || body.none { line -> line.contains("branches:") && line.contains("main") }) {
+            violations.add("the pipeline is not triggered by a push to main")
+        }
+        if (body.none { line -> line.contains("workflow_dispatch:") }) {
+            violations.add("the pipeline is not triggered by workflow_dispatch; a rerun must be possible without a commit")
+        }
+        if (body.none { line -> line.trim() == "concurrency:" }) {
+            violations.add("the pipeline has no concurrency group; a superseded run keeps burning runner minutes")
+        } else if (body.none { line -> line.contains("cancel-in-progress: true") }) {
+            violations.add("the pipeline's concurrency group does not set cancel-in-progress: true; a superseded run keeps burning runner minutes")
+        }
+        if (body.none { line -> line.contains("contents: read") } || body.any { line -> WRITE_PERMISSION.containsMatchIn(line) }) {
+            violations.add("the pipeline's permissions are not read-only; the build needs contents: read and nothing more")
         }
     }
 
     /** The workflow's lines with their comments removed, so a sentence is not a step. */
     private fun bodyOf(lines: List<String>): List<String> =
         lines.map { line -> line.substringBefore('#').trimEnd() }.filter { line -> line.isNotEmpty() }
-
-    /**
-     * The JDK the leg builds with, and the Gradle user home the next run restores.
-     * The patch is pinned, not the major version: `jlink` links the JDK's own
-     * modules, so a floating patch links a different image on each leg.
-     */
-    private fun checkToolchain(body: List<String>, violations: MutableList<String>) {
-        val javaStep = stepLines(body, "actions/setup-java")
-        if (javaStep == null) {
-            violations.add("the pipeline sets up no JDK; ubuntu and windows default to Java 17, and jlink links the JDK the leg runs")
-        } else {
-            if (javaStep.none { line -> line.contains("distribution: temurin") }) {
-                violations.add("the pipeline's JDK step names no Temurin distribution; the image is linked from that JDK")
-            }
-            if (javaStep.none { line -> PINNED_JDK.containsMatchIn(line) }) {
-                violations.add("the pipeline's JDK step names no 21.0.13; an unpinned patch links a different image on each leg")
-            }
-        }
-        if (body.none { line -> line.contains("gradle/actions/setup-gradle") }) {
-            violations.add(
-                "the pipeline uses no gradle/actions/setup-gradle; " +
-                    "it validates the wrapper and restores the Gradle user home, so a wrapper-validation step of its own is redundant",
-            )
-        }
-    }
 
     /**
      * One step of the workflow: the line that names the action and the lines
@@ -1464,21 +1479,6 @@ class CiPipelineRule(
     }
 
     private fun indentOf(line: String): Int = line.length - line.trimStart().length
-
-    private fun checkRunnerLabels(body: List<String>, violations: MutableList<String>) {
-        val legs = RUNNER_LABELS.joinToString(separator = ", ")
-        RUNNER_LABELS.filterNot { label -> body.any { line -> line.contains(label) } }.forEach { label ->
-            violations.add("the pipeline's matrix carries no $label; the three legs are $legs, pinned to exact labels")
-        }
-        if (body.none { line -> line.contains("runs-on: \${{ matrix.os }}") }) {
-            violations.add("the pipeline's job runs on no matrix label; the three labels are three hosts only if the job runs on them")
-        }
-        body.forEach { line ->
-            FLOATING_RUNNER_LABEL.find(line)?.let { floating ->
-                violations.add("the pipeline runs on ${floating.value}; a -latest label moves the OS baseline, and the JavaFX classifier with it")
-            }
-        }
-    }
 
     companion object {
         const val PATH = ".github/workflows/ci.yml"
