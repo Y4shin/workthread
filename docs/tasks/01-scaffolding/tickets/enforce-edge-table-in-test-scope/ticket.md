@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Enforce the edge table in test scope
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 size: s
 ---
