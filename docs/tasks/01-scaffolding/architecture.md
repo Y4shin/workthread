@@ -72,11 +72,11 @@ Stack tests and fixture data restate some pinned versions, so a bump edits more 
 
 **The dependency checks.** Two root-build checks, attached to `check`.
 
-The first reads each module's declared dependencies in `afterEvaluate`, across both the `compileClasspath` and `runtimeClasspath` hierarchies, and fails when a project dependency leaves the module's edge row, naming the module and the dependency. It also fails when `core` declares Spring or JavaFX. External libraries are judged in `core` alone, for those two families, because the other modules legitimately declare libraries. Platform declarations are filtered before the rule sees them, and no fixture covers that filter, so it is an untested path rather than a proven one.
+The first reads each module's declared dependencies in `afterEvaluate`, across both classpath hierarchies of both source sets, and fails when a project dependency leaves the module's edge row, naming the module and the dependency. It also fails when `core` declares Spring or JavaFX. Test scope is read: a forbidden edge declared as `testImplementation` fails, and a declaration the test source set inherits from `main` is judged once, so one violation earns one refusal. External libraries are judged in `core` alone, for those two families, because the other modules legitimately declare libraries. Platform declarations are filtered before the rule sees them, and no fixture covers that filter, so it is an untested path rather than a proven one.
 
 The second inspects each module's resolved `runtimeClasspath` and fails when a JavaFX artifact appears on it. The client is the one module allowed to carry JavaFX, because the declared stack puts it there; the rule refuses JavaFX on every other module's runtime classpath.
 
-Test scope is not read: the checks cover the main source sets, so a forbidden module edge declared as `testImplementation` passes today.
+The runtime classpath check reads the `runtimeClasspath` configuration of the main source set only; the test source set is the declared-dependency rule's business.
 
 **The descriptor check.** One per module, attached to `check`, reading the built jar with `ModuleFinder`. It refuses a missing descriptor, an automatic descriptor, a wrong module name, a `requires` outside the edge row, a missing `requires` for an edge the row names, a missing export, and a descriptor on `api`. For `client` it also refuses a missing application class, or an export set that does not cover that class. It judges build modules only, so a JDK or declared-stack module in `requires` is not judged by the edge table.
 
@@ -84,11 +84,11 @@ Test scope is not read: the checks cover the main source sets, so a forbidden mo
 
 **The pipeline check.** `verifyCiWorkflow` at the root, attached to `check`, reading `.github/workflows/ci.yml` as text. It refuses a runner label that is not the pinned one, a `-latest` label, the wrong JDK patch as text, a missing wrapper setup or image task, a wrong artifact path or retention, a missing concurrency group, an artifact upload that tolerates a missing image, and any Xvfb or GTK step. It also refuses `jpackage` and the installer prerequisites that only an installer needs: `fakeroot`, `dpkg-deb`, and `wix`. It matches action names without their majors, so a major bump passes, and it reads the file as text, so a semantically identical reformat fails. Both are the accepted cost of not carrying a YAML parser in the root build.
 
-**The fixture convention.** One plain data list per rule family, holding either a violation and the message its refusal must carry, or a permitted declaration with no expectation. `FixtureChecks` owns the refusal helper, the count line, and the wording of a disagreement, and one registration loop gives every family its task on the root `check`. A family declares only its cases.
+**The fixture convention.** One plain data list per rule, holding either a violation and the message its refusal must carry, or a permitted declaration with no expectation. `FixtureChecks` owns the refusal helper, the count line, and the wording of a disagreement, and one registration loop gives every family its task on the root `check`. A family declares only its cases, and a family made of two rules holds one list per rule.
 
 | Family | Fixtures | Cases |
 | --- | --- | --- |
-| Dependency rules | 7 | edge row, `core`'s Spring and JavaFX ban, allowed declarations |
+| Dependency rules | 10 | edge row and `core`'s Spring and JavaFX ban in both source sets, allowed declarations |
 | Module descriptor | 9 | missing, misnamed, `requires` outside the row, missing `requires`, missing export, missing application class, descriptor on the classpath module, two accepted |
 | Version and surface | 14 | jar reports another number or none, a source restating it, snapshot removal and reshape |
 | Pipeline | 23 | one refusal per pinned fact, plus a comment-only accepted case |
@@ -205,7 +205,7 @@ The tickets were numbered in dependency order. Each entry is what that ticket le
 
 **3. Named modules.** The seven descriptors under `io.github.y4shin.workthread.<module>`, one marker per exported package, `WorkthreadApplication` as `client`'s, `api` with no descriptor, and `verifyModuleDescriptor` on every module's `check`. The ticket left the rule without fixtures, proven by probes only; the end-of-effort coherence pass gave it a `DescriptorShape` seam and nine committed fixtures.
 
-**4. Dependency rules.** `verifyModuleDependencies` and `verifyNoJavaFxOnRuntimeClasspath` per module, the fixture family behind `verifyDependencyRuleFixtures` with seven fixtures (five refusals, two acceptances), the `client` exemption in the JavaFX rule, and the configuration-time refusal of a subproject with no edge row.
+**4. Dependency rules.** `verifyModuleDependencies` and `verifyNoJavaFxOnRuntimeClasspath` per module, the fixture family behind `verifyDependencyRuleFixtures` with ten fixtures (six refusals, four acceptances, two refusals and two acceptances reading the test source set), the `client` exemption in the JavaFX rule, and the configuration-time refusal of a subproject with no edge row.
 
 **5. Version and contract surface.** `Implementation-Title` and `Implementation-Version` on every jar, the generated `workthread-version.properties` behind the window label, `verifyVersion` with its `src` scan, the committed `contract/api-snapshot.txt` (one package, one type), `verifyContractApiSnapshot`, `generateContractApiSnapshot`, fourteen version and surface fixtures, and `docs/releasing.md` with the tag ritual. No tag was created.
 
@@ -214,6 +214,8 @@ The tickets were numbered in dependency order. Each entry is what that ticket le
 **7. Three-platform pipeline.** `.github/workflows/ci.yml`, its three legs, the uploaded `image-<runner>` artifacts, and the fourth fixture family that guards the file as text: `verifyCiWorkflow` and `verifyCiWorkflowFixtures`, twenty-three fixtures. The first run was green on all three legs.
 
 **8. Manual launch check.** The record in `docs/dev-env.md`: the Linux launch from the pipeline's own artifact, the runtime prerequisites read from `ldd`, and the macOS patch divergence found while inspecting the artifacts. The macOS and Windows launches did not happen, because no host for either platform was reached; those two criteria are recorded as unmet rather than passed.
+
+**9. Edge table in test scope.** A ticket the end-of-effort review of this effort opened. `verifyModuleDependencies` now reads the `test` source set in the same `afterEvaluate` read that reads `main`, so a forbidden edge declared as `testImplementation` is refused with the same message a main-scope one earns, and `core`'s Spring and JavaFX ban covers `core`'s test scope. The test set's declarations are read as the delta against `main`, so a declaration the test classpath inherits is judged once. The family grew by two refusals and one acceptance. `verifyNoJavaFxOnRuntimeClasspath` was not extended to the test runtime classpath.
 
 ## How this document changes
 
