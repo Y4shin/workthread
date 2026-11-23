@@ -76,11 +76,15 @@ Test scope is not read: the checks cover the main source sets, so a forbidden mo
 
 **The descriptor check.** One per module, attached to `check`, reading the built jar with `ModuleFinder`. It refuses a missing descriptor, an automatic descriptor, a wrong module name, a `requires` outside the edge row, a missing `requires` for an edge the row names, a missing export, and a descriptor on `api`. For `client` it also refuses a missing application class, or an export set that does not cover that class. It judges build modules only, so a JDK or declared-stack module in `requires` is not judged by the edge table.
 
-**The fixture convention.** Plain data lists holding either a violation and the message its refusal must carry, or a permitted declaration with no expectation; one runner; one root task attached to the root `check`. The dependency rules carry seven committed fixtures. The descriptor rule currently carries none, and its non-vacuity rests on probes recorded in the `named-modules` deviation report; giving it fixtures is open work.
+**The version check.** `verifyVersion` at the root, attached to `check`. It reads the eight built jars back and refuses a jar that reports another number or none, and it refuses any file under a module's `src` that restates the number as a whole number. Build scripts, documentation, and generated files are out of its scope on purpose, so fixture data and prose may name a version.
+
+**The fixture convention.** One plain data list per rule family, holding either a violation and the message its refusal must carry, or a permitted declaration with no expectation; one runner per family; one root task per family, attached to the root `check`. The dependency rules carry seven committed fixtures. The descriptor rule currently carries none, and its non-vacuity rests on probes recorded in the `named-modules` deviation report; giving it fixtures is open work. The version and surface rules carry fourteen.
 
 No third-party rule plugin.
 
-**Version and additivity.** `0.1.0` lives in one property, and an annotated git tag marks each release. A committed snapshot holds every exported package of `contract`; `check` compares the current surface against it and fails when an exported type or member disappears or changes shape, naming what changed. Because 0.1 exports almost nothing, a committed fixture reproduces a removal so the check's failure path is proven. The snapshot covers `contract` only at 0.1, and it includes `ContractPlaceholder`.
+**Version and additivity.** `0.1.0` lives in one property, `gradle.properties`, and three enforcers read it: `Implementation-Title` and `Implementation-Version` on every jar, the client's generated version resource, and `verifyVersion`. An annotated `v<version>` git tag marks each release, and `docs/releasing.md` names who tags, when, and the snapshot ritual.
+
+A committed snapshot at `contract/api-snapshot.txt` holds every exported package of `contract` plus its public and protected types and members. `verifyContractApiSnapshot` compares it and fails when an element disappears or changes shape, naming the element and both shapes. Additions pass, so recording one is a ritual rather than a gate: `generateContractApiSnapshot` rewrites the file and the diff is the review. A committed fixture reproduces the removal path. The snapshot covers `contract` only at 0.1, and it includes `ContractPlaceholder`.
 
 ## Packaging
 
@@ -111,13 +115,13 @@ jlink {
 
 The client's descriptor requires `javafx.controls`, which reads `javafx.graphics` transitively, and exports the package holding its `Application` subclass, or JavaFX cannot construct it. The application class carries `main`, so the image launcher, the generated start scripts, and `:client:run` share one entry point.
 
-The image is `client/build/image` and the launcher is `client/build/image/bin/workthread`. On Linux x86_64 it is 67 611 290 bytes (64.5 MiB). It carries `java.base`, `java.desktop`, `java.xml`, `java.prefs`, `java.datatransfer`, `jdk.unsupported`, `jdk.jfr`, and `javafx.base`, `javafx.controls`, `javafx.graphics` 21.0.13, plus `client`, `contract`, and `wiring`. It includes `jdk.jfr` because `jdeps` follows JavaFX's JFR logging classes. The JDK module set is inferred by the plugin, not declared by a descriptor, so the descriptor-as-single-source rule covers the project and JavaFX modules only.
+The image is `client/build/image` and the launcher is `client/build/image/bin/workthread`. On Linux x86_64 it is 67 612 510 bytes. It carries `java.base`, `java.desktop`, `java.xml`, `java.prefs`, `java.datatransfer`, `jdk.unsupported`, `jdk.jfr`, and `javafx.base`, `javafx.controls`, `javafx.graphics` 21.0.13, plus `client`, `contract`, and `wiring`. It includes `jdk.jfr` because `jdeps` follows JavaFX's JFR logging classes. The JDK module set is inferred by the plugin, not declared by a descriptor, so the descriptor-as-single-source rule covers the project and JavaFX modules only.
 
 At run time the image needs the host's GTK3 and X11 libraries, `libGL` and `libXxf86vm.so.1` for the ES2 pipeline, and a writable `~/.openjfx/cache` where the first launch extracts the JavaFX natives. The generated launcher points at a module directory that does not exist inside the image; the application module is in the linked runtime and the launcher works regardless. That quirk is cosmetic and accepted.
 
 Because `client` applies `application`, `:client:assemble` also emits `distTar` and `distZip`. Nothing consumes those distributions; the image is the shipping artifact. Whether they stay is open.
 
-The empty window carries the title `workthread`, is 1024x768, and shows one centred label reading `workthread 0.1.0`. The label text is a literal today, and the single version source does not feed it yet. It is the packaging proof, not a feature, and it holds no state.
+The empty window carries the title `workthread`, is 1024x768, and shows one centred label reading `workthread <version>`. The label renders the single version source through a generated `workthread-version.properties` resource, not a typed literal, so a version bump moves the window with no code change. The window is the packaging proof, not a feature, and it holds no state.
 
 ## CI
 
