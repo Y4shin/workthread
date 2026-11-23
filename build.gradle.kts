@@ -584,12 +584,17 @@ class VersionRule(
             }
         }
         moduleSources.toSortedMap().forEach { (path, text) ->
-            if (text.contains(source)) {
+            if (restatesSource(text)) {
                 violations.add("$path restates the version $source; gradle.properties is the one source")
             }
         }
         return violations
     }
+
+    // A whole number, not a fragment of a longer one: at version 1.0, the JavaFX
+    // version 21.0.13 and a note about 10.1.0 would otherwise read as copies.
+    private fun restatesSource(text: String): Boolean =
+        Regex("(?<![\\d.])" + Regex.escape(source) + "(?![\\d.])").containsMatchIn(text)
 }
 
 /**
@@ -1129,6 +1134,26 @@ val versionFixtures = listOf(
         moduleSources = mapOf(
             "client/src/main/java/io/github/y4shin/workthread/client/WorkthreadApplication.java" to
                 "// 1024x768, measured on 2026-11-23",
+        ),
+        expectedRefusal = null,
+    ),
+    VersionFixture(
+        what = "a source file carries a longer number",
+        source = "1.0",
+        reportedVersions = mapOf("client" to "1.0"),
+        moduleSources = mapOf(
+            "client/src/main/java/io/github/y4shin/workthread/client/WorkthreadApplication.java" to
+                "// javafx 21.0.13, and the test ran on 10.1.0",
+        ),
+        expectedRefusal = null,
+    ),
+    VersionFixture(
+        what = "a source file carries the version inside another number",
+        source = "1.0",
+        reportedVersions = mapOf("client" to "1.0"),
+        moduleSources = mapOf(
+            "client/src/main/java/io/github/y4shin/workthread/client/WorkthreadApplication.java" to
+                "// pinned at 11.0.4 and 1.05",
         ),
         expectedRefusal = null,
     ),
