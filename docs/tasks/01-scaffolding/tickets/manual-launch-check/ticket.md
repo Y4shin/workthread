@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Record the manual launch check on each platform
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - three-platform-ci
 size: s
