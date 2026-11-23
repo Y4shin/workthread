@@ -4,6 +4,9 @@
 
 import java.io.File
 import java.lang.module.ModuleDescriptor
+import java.lang.reflect.Modifier
+import java.lang.reflect.Type
+import java.net.URLClassLoader
 import java.lang.module.ModuleFinder
 import java.util.jar.JarFile
 import java.util.zip.ZipFile
@@ -590,6 +593,48 @@ class VersionRule(
 }
 
 /**
+ * The additivity rule: every element of the committed snapshot has to be in the
+ * surface the build exports today, in the same shape. An element the snapshot
+ * does not know is additive and passes, because a `0.x` export may still grow; a
+ * removed or reshaped one names what changed, so the diff and the failure say
+ * the same thing.
+ */
+class ApiSurfaceRule(
+    private val module: String,
+    private val snapshotPath: String,
+    private val baseline: List<String>?,
+    private val current: List<String>,
+) : DependencyRule() {
+
+    override fun violations(): List<String> {
+        if (baseline == null) {
+            return listOf("$snapshotPath is missing; $module's exported surface has no committed snapshot to compare against")
+        }
+        val held = elements(baseline)
+        val built = elements(current)
+        val violations = mutableListOf<String>()
+        held.forEach { (element, shape) ->
+            val now = built[element]
+            when {
+                now == null ->
+                    violations.add("$module's exported surface no longer holds $element; the snapshot holds it as '$shape'")
+                now != shape ->
+                    violations.add("$module's exported surface changed shape for $element: the snapshot holds '$shape', the build holds '$now'")
+            }
+        }
+        return violations
+    }
+
+    // One element per line: its name, a TAB, and its shape. `#` lines are the
+    // snapshot's header and hold no element.
+    private fun elements(lines: List<String>): Map<String, String> =
+        lines
+            .map { line -> line.trim() }
+            .filter { line -> line.isNotEmpty() && !line.startsWith("#") }
+            .associate { line -> line.substringBefore('\t').trim() to line.substringAfter('\t', "").trim() }
+}
+
+/**
  * Every module's built jar and every module's sources, checked against the one
  * version property. The jar is read rather than the build script, because the
  * artifact is where a consumer reads a module's version.
@@ -655,6 +700,216 @@ tasks.register<VerifyVersion>("verifyVersion") {
     moduleSources.from(subprojects.map { subproject -> subproject.file("src") })
 }
 tasks.named("check") { dependsOn("verifyVersion") }
+
+// ---------------------------------------------------------------------------
+// The contract API snapshot
+// ---------------------------------------------------------------------------
+
+/**
+ * The exported surface of one jar: its exported packages, and the public and
+ * protected types and members in them, one element per line as
+ * `<element>` TAB `<shape>`.
+ *
+ * <p>The text is the committed snapshot's format, so a review reads a change to
+ * the API as a diff and the comparison runs on strings. Only public and
+ * protected members are the surface: a private constructor or a package-private
+ * type is the module's own business, not a promise to its consumers.
+ */
+object ExportedSurface {
+
+    fun read(jar: File): List<String> {
+        val module = ModuleFinder.of(jar.toPath()).findAll().singleOrNull()
+            ?: throw GradleException("${jar.name} carries no module descriptor, and an exported surface is read from one")
+        val exportedPackages = module.descriptor().exports().map { export -> export.source() }.distinct().sorted()
+        val elements = exportedPackages.map { name -> "package $name" to "exported" }.toMutableList()
+        URLClassLoader(arrayOf(jar.toURI().toURL()), ClassLoader.getPlatformClassLoader()).use { loader ->
+            classNamesIn(jar, exportedPackages).forEach { name ->
+                val type = load(name, loader)
+                if (Modifier.isPublic(type.modifiers) || Modifier.isProtected(type.modifiers)) {
+                    elements.add("type ${type.name}" to shapeOf(type))
+                    elements.addAll(membersOf(type))
+                }
+            }
+        }
+        return elements.sortedBy { element -> element.first }.map { (element, shape) -> "$element\t$shape" }
+    }
+
+    // Every class file in an exported package, nested types included: a nested
+    // type a module exports is part of its surface like any other.
+    private fun classNamesIn(jar: File, exportedPackages: List<String>): List<String> =
+        ZipFile(jar).use { archive ->
+            archive.entries().asSequence()
+                .map { entry -> entry.name }
+                .filter { name -> name.endsWith(".class") }
+                .filter { name -> name != "module-info.class" }
+                .filter { name -> name.substringAfterLast('/') != "package-info.class" }
+                .filter { name -> exportedPackages.any { exported -> name.startsWith(exported.replace('.', '/') + "/") } }
+                .map { name -> name.removeSuffix(".class").replace('/', '.') }
+                .sorted()
+                .toList()
+        }
+
+    private fun load(name: String, loader: ClassLoader): Class<*> =
+        try {
+            Class.forName(name, false, loader)
+        } catch (unloadable: ClassNotFoundException) {
+            throw GradleException("$name is in the contract jar and its surface cannot be read", unloadable)
+        }
+
+    private fun shapeOf(type: Class<*>): String {
+        val declaration = buildString {
+            val modifiers = Modifier.toString(type.modifiers)
+            if (modifiers.isNotEmpty()) {
+                append(modifiers).append(' ')
+            }
+            append(kindOf(type))
+            if (type.typeParameters.isNotEmpty()) {
+                append('<').append(type.typeParameters.joinToString(separator = ", ") { parameter -> parameter.name }).append('>')
+            }
+        }
+        val supertypes = mutableListOf<String>()
+        if (!type.isInterface) {
+            type.genericSuperclass?.let { superclass -> supertypes.add("extends ${superclass.typeName}") }
+        }
+        val interfaces = type.genericInterfaces.map { implemented -> implemented.typeName }.sorted()
+        if (interfaces.isNotEmpty()) {
+            val word = if (type.isInterface) "extends" else "implements"
+            supertypes.add("$word ${interfaces.joinToString(separator = ", ")}")
+        }
+        return listOf(declaration).plus(supertypes).joinToString(separator = " ")
+    }
+
+    private fun kindOf(type: Class<*>): String =
+        when {
+            type.isAnnotation -> "annotation"
+            type.isInterface -> "interface"
+            type.isEnum -> "enum"
+            type.isRecord -> "record"
+            else -> "class"
+        }
+
+    private fun membersOf(type: Class<*>): List<Pair<String, String>> {
+        val members = mutableListOf<Pair<String, String>>()
+        type.declaredConstructors
+            .filter { constructor -> Modifier.isPublic(constructor.modifiers) || Modifier.isProtected(constructor.modifiers) }
+            .forEach { constructor ->
+                members.add(
+                    "constructor ${type.name}(${parametersOf(constructor.genericParameterTypes)})" to
+                        (modifiersOf(constructor.modifiers) + throwsClauseOf(constructor.genericExceptionTypes)).trim(),
+                )
+            }
+        type.declaredMethods
+            .filter { method -> (Modifier.isPublic(method.modifiers) || Modifier.isProtected(method.modifiers)) && !method.isSynthetic && !method.isBridge }
+            .forEach { method ->
+                members.add(
+                    "method ${type.name}#${method.name}(${parametersOf(method.genericParameterTypes)})" to
+                        "${modifiersOf(method.modifiers)}returns ${method.genericReturnType.typeName}${throwsClauseOf(method.genericExceptionTypes)}",
+                )
+            }
+        type.declaredFields
+            .filter { field -> Modifier.isPublic(field.modifiers) || Modifier.isProtected(field.modifiers) }
+            .forEach { field ->
+                members.add("field ${type.name}#${field.name}" to "${modifiersOf(field.modifiers)}${field.genericType.typeName}")
+            }
+        return members
+    }
+
+    private fun parametersOf(types: Array<Type>): String =
+        types.joinToString(separator = ", ") { parameter -> parameter.typeName }
+
+    private fun throwsClauseOf(types: Array<Type>): String =
+        if (types.isEmpty()) "" else " throws " + types.map { thrown -> thrown.typeName }.sorted().joinToString(separator = ", ")
+
+    private fun modifiersOf(modifiers: Int): String =
+        Modifier.toString(modifiers).takeIf { words -> words.isNotEmpty() }?.plus(" ").orEmpty()
+}
+
+/** Reads the contract jar's exported surface, so the snapshot and the check agree on what it is. */
+abstract class ContractSurfaceTask : DefaultTask() {
+
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val contractJar: RegularFileProperty
+
+    protected fun surface(): List<String> = ExportedSurface.read(contractJar.get().asFile)
+}
+
+/**
+ * The snapshot in `check`: every committed element has to survive in the surface
+ * the contract jar exports today, so a consumer never meets a removal the build
+ * let through.
+ */
+abstract class VerifyContractApiSnapshot : ContractSurfaceTask() {
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val snapshot: ConfigurableFileCollection
+
+    @TaskAction
+    fun verifySurface() {
+        val file = snapshot.files.singleOrNull()
+        ApiSurfaceRule(
+            module = CONTRACT,
+            snapshotPath = SNAPSHOT_PATH,
+            baseline = file?.takeIf { existing -> existing.exists() }?.readLines(),
+            current = surface(),
+        ).verify()
+    }
+
+    private companion object {
+        const val CONTRACT = "contract"
+        const val SNAPSHOT_PATH = "contract/api-snapshot.txt"
+    }
+}
+
+/**
+ * The deliberate rewrite: the snapshot is committed, so a changed surface is
+ * written by hand, reviewed as a diff, and only then committed.
+ */
+abstract class GenerateContractApiSnapshot : ContractSurfaceTask() {
+
+    @get:OutputFile
+    abstract val snapshot: RegularFileProperty
+
+    @TaskAction
+    fun writeSurface() {
+        val file = snapshot.get().asFile
+        file.parentFile.mkdirs()
+        file.writeText(HEADER + surface().joinToString(separator = "\n", postfix = "\n"))
+    }
+
+    private companion object {
+        val HEADER = """
+            # The contract module's exported surface: every exported package, and the
+            # public and protected types and members in it, one element per line as
+            # `<element>` TAB `<shape>`.
+            #
+            # `./gradlew check` compares this file with the built contract jar and fails
+            # when an element disappears or changes shape. `./gradlew
+            # generateContractApiSnapshot` rewrites it after a change the release means
+            # to ship, and the diff is then the review.
+            """.trimIndent() + "\n"
+    }
+}
+
+// The root build hosts the snapshot task, as the architecture says, and the
+// committed file is in `contract` so a reader of that module finds it.
+val contractApiSnapshot = rootProject.file("contract/api-snapshot.txt")
+
+tasks.register<VerifyContractApiSnapshot>("verifyContractApiSnapshot") {
+    group = "verification"
+    description = "Refuses a change that removes or reshapes an element of contract's committed exported surface."
+    contractJar.set(project(":contract").tasks.named<Jar>("jar").flatMap { jar -> jar.archiveFile })
+    snapshot.from(contractApiSnapshot)
+}
+tasks.named("check") { dependsOn("verifyContractApiSnapshot") }
+
+tasks.register<GenerateContractApiSnapshot>("generateContractApiSnapshot") {
+    group = "verification"
+    description = "Rewrites contract/api-snapshot.txt from the built jar after an additive change to the contract API."
+    contractJar.set(project(":contract").tasks.named<Jar>("jar").flatMap { jar -> jar.archiveFile })
+    snapshot.set(contractApiSnapshot)
+}
 
 // ---------------------------------------------------------------------------
 // The fixtures: one declared violation per failure, and the refusal it must
@@ -880,13 +1135,90 @@ val versionFixtures = listOf(
 )
 
 /**
+ * An exported surface and the refusal it must produce: the committed snapshot's
+ * lines (null for a file that is not there), the surface the built jar holds,
+ * and the refusal each one must carry, or null when the change is additive.
+ */
+class ApiSurfaceFixture(
+    val what: String,
+    val snapshot: List<String>?,
+    val surface: List<String>,
+    val expectedRefusal: String?,
+)
+
+// The snapshot's own format, element TAB shape, as the committed file holds it.
+private val CONTRACT_PACKAGE = "package io.github.y4shin.workthread.contract\texported"
+private val CONTRACT_PLACEHOLDER =
+    "type io.github.y4shin.workthread.contract.ContractPlaceholder\tpublic final class extends java.lang.Object"
+private val PORT_TYPE = "type io.github.y4shin.workthread.contract.ForThinking\tpublic abstract interface extends java.lang.Object"
+private val PORT_METHOD =
+    "method io.github.y4shin.workthread.contract.ForThinking#start(java.lang.String)\tpublic abstract returns void"
+
+// Each fixture is one surface change a consumer can feel. The removals and the
+// reshape are refusals, because the snapshot is the promise; an addition is not,
+// because adding to an exported surface is what `0.x` may still do.
+val apiSurfaceFixtures = listOf(
+    ApiSurfaceFixture(
+        what = "a type is removed",
+        snapshot = listOf(CONTRACT_PACKAGE, CONTRACT_PLACEHOLDER),
+        surface = listOf(CONTRACT_PACKAGE),
+        expectedRefusal = "contract's exported surface no longer holds " +
+            "type io.github.y4shin.workthread.contract.ContractPlaceholder; " +
+            "the snapshot holds it as 'public final class extends java.lang.Object'",
+    ),
+    ApiSurfaceFixture(
+        what = "a type changes shape",
+        snapshot = listOf(CONTRACT_PACKAGE, CONTRACT_PLACEHOLDER),
+        surface = listOf(CONTRACT_PACKAGE, "type io.github.y4shin.workthread.contract.ContractPlaceholder\tpublic class extends java.lang.Object"),
+        expectedRefusal = "contract's exported surface changed shape for " +
+            "type io.github.y4shin.workthread.contract.ContractPlaceholder: " +
+            "the snapshot holds 'public final class extends java.lang.Object', the build holds 'public class extends java.lang.Object'",
+    ),
+    ApiSurfaceFixture(
+        what = "an exported package is removed",
+        snapshot = listOf(CONTRACT_PACKAGE, CONTRACT_PLACEHOLDER),
+        surface = listOf(CONTRACT_PLACEHOLDER),
+        expectedRefusal = "contract's exported surface no longer holds package io.github.y4shin.workthread.contract; " +
+            "the snapshot holds it as 'exported'",
+    ),
+    ApiSurfaceFixture(
+        what = "a member is removed",
+        snapshot = listOf(CONTRACT_PACKAGE, PORT_TYPE, PORT_METHOD),
+        surface = listOf(CONTRACT_PACKAGE, PORT_TYPE),
+        expectedRefusal = "contract's exported surface no longer holds " +
+            "method io.github.y4shin.workthread.contract.ForThinking#start(java.lang.String)",
+    ),
+    ApiSurfaceFixture(
+        what = "a member is added",
+        snapshot = listOf(CONTRACT_PACKAGE, PORT_TYPE),
+        surface = listOf(CONTRACT_PACKAGE, PORT_TYPE, PORT_METHOD),
+        expectedRefusal = null,
+    ),
+    ApiSurfaceFixture(
+        what = "a type is added",
+        snapshot = listOf(CONTRACT_PACKAGE),
+        surface = listOf(CONTRACT_PACKAGE, CONTRACT_PLACEHOLDER),
+        expectedRefusal = null,
+    ),
+    ApiSurfaceFixture(
+        what = "the committed snapshot is missing",
+        snapshot = null,
+        surface = listOf(CONTRACT_PACKAGE, CONTRACT_PLACEHOLDER),
+        expectedRefusal = "contract/api-snapshot.txt is missing; contract's exported surface has no committed snapshot to compare against",
+    ),
+)
+
+/**
  * Runs the version and surface fixtures, and reports the ones whose rule did not
  * answer as the fixture says. One runner for this ticket's fixtures: each list
  * is plain data, so a later ticket adds its own list and its own runner.
  */
-class VersionAndSurfaceFixtures(private val versionFixtures: List<VersionFixture>) : FixtureChecks() {
+class VersionAndSurfaceFixtures(
+    private val versionFixtures: List<VersionFixture>,
+    private val apiSurfaceFixtures: List<ApiSurfaceFixture>,
+) : FixtureChecks() {
 
-    fun count(): Int = versionFixtures.size
+    fun count(): Int = versionFixtures.size + apiSurfaceFixtures.size
 
     fun problems(): List<String> {
         val problems = mutableListOf<String>()
@@ -896,6 +1228,17 @@ class VersionAndSurfaceFixtures(private val versionFixtures: List<VersionFixture
                     source = fixture.source,
                     reportedVersions = fixture.reportedVersions,
                     moduleSources = fixture.moduleSources,
+                ),
+            )
+            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        apiSurfaceFixtures.forEach { fixture ->
+            val refusal = refusalOf(
+                ApiSurfaceRule(
+                    module = "contract",
+                    snapshotPath = "contract/api-snapshot.txt",
+                    baseline = fixture.snapshot,
+                    current = fixture.surface,
                 ),
             )
             fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
@@ -935,9 +1278,9 @@ abstract class FixtureChecks {
 
 tasks.register("verifyVersionAndSurfaceFixtures") {
     group = "verification"
-    description = "Proves the version rule refuses a module that reports another version or a source that restates it."
+    description = "Proves the version rule refuses a module that reports another version or a source that restates it, and the surface rule refuses a removed or reshaped export."
     // Plain data, built here so the action holds no reference to the build script.
-    val fixtures = VersionAndSurfaceFixtures(versionFixtures)
+    val fixtures = VersionAndSurfaceFixtures(versionFixtures, apiSurfaceFixtures)
     doLast {
         val problems = fixtures.problems()
         if (problems.isNotEmpty()) {
