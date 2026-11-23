@@ -12,6 +12,17 @@ title: Task Changelog
 
 
 
+
+## 2026-11-23, Enforce the edge table in test scope (enforce-edge-table-in-test-scope)
+
+`verifyModuleDependencies` now reads every module's `test` source set (`testCompileClasspath` and `testRuntimeClasspath`) in the same `afterEvaluate` read that already covered `main`, and judges it with the same rule and the same refusal message. A project dependency outside the module's edge row, declared as `testImplementation`, now fails `check`.
+
+The test scope is read as the delta against main, because `testImplementation` extends `implementation`: an inherited declaration is judged once, in main scope. `core`'s Spring and JavaFX ban now covers its test scope as well. The gathering moved into three shared helpers and the rule body into `refusalsFor`, so one implementation serves both scopes.
+
+`verifyDependencyRuleFixtures` went from 7 to 10 cases: a test-scope project edge outside the row, Spring in `core`'s test scope, and the matching acceptance that guards the allowed edge. The count is printed from `cases().size`.
+
+Outcome: `./gradlew build` is green with every check enabled and the configuration cache reused. No plugin, no build-logic project, and no new task.
+
 ## 2026-11-23, Record the manual launch check on each platform (manual-launch-check)
 
 The launch check now runs against the images the pipeline builds. `docs/dev-env.md` records the three artifacts, their unpacked sizes, and both launchers, `bin/workthread` and `bin/workthread.bat`.
