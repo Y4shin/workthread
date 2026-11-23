@@ -5,6 +5,7 @@
 import java.io.File
 import java.lang.module.ModuleDescriptor
 import java.lang.module.ModuleFinder
+import java.util.jar.JarFile
 import java.util.zip.ZipFile
 import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.artifacts.VersionCatalogsExtension
@@ -93,6 +94,18 @@ subprojects {
     configure<JavaPluginExtension> {
         toolchain {
             languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    // Every jar reports the version it was built from, so "which version is this
+    // module?" is answered by the artifact rather than by the build script. The
+    // root version check reads these two attributes back out of the built jars.
+    tasks.withType<Jar>().configureEach {
+        manifest {
+            attributes(
+                "Implementation-Title" to project.name,
+                "Implementation-Version" to project.version,
+            )
         }
     }
 
@@ -542,6 +555,108 @@ abstract class VerifyModuleDescriptor : DefaultTask() {
 }
 
 // ---------------------------------------------------------------------------
+// The version
+// ---------------------------------------------------------------------------
+
+/**
+ * The version rule: `gradle.properties` is the one source, every module reports
+ * that number in its own jar, and no source file restates it. A second copy
+ * drifts on the next bump, and an artifact that reports another number cannot be
+ * traced to a release tag.
+ */
+class VersionRule(
+    private val source: String,
+    private val reportedVersions: Map<String, String>,
+    private val moduleSources: Map<String, String>,
+) : DependencyRule() {
+
+    override fun violations(): List<String> {
+        val violations = mutableListOf<String>()
+        reportedVersions.toSortedMap().forEach { (module, reported) ->
+            when {
+                reported.isEmpty() ->
+                    violations.add("$module reports no version in its jar; every module reports the version in gradle.properties")
+                reported != source ->
+                    violations.add("$module's jar reports version $reported, and gradle.properties says $source")
+            }
+        }
+        moduleSources.toSortedMap().forEach { (path, text) ->
+            if (text.contains(source)) {
+                violations.add("$path restates the version $source; gradle.properties is the one source")
+            }
+        }
+        return violations
+    }
+}
+
+/**
+ * Every module's built jar and every module's sources, checked against the one
+ * version property. The jar is read rather than the build script, because the
+ * artifact is where a consumer reads a module's version.
+ *
+ * <p>`reportedVersions` holds the number each jar reports, and an empty string
+ * for a jar that reports none: a map cannot hold a missing value, and "reports
+ * nothing" is a refusal of its own.
+ */
+abstract class VerifyVersion : DefaultTask() {
+
+    @get:Input
+    abstract val sourceVersion: Property<String>
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val moduleJars: ConfigurableFileCollection
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val moduleSources: ConfigurableFileCollection
+
+    // The paths only format the refusal; the sources are fingerprinted relative
+    // to their roots, so the check stays relocatable.
+    @get:Internal
+    abstract val rootDirectory: DirectoryProperty
+
+    @TaskAction
+    fun verifyReportedVersions() {
+        val root = rootDirectory.get().asFile
+        VersionRule(
+            source = sourceVersion.get(),
+            reportedVersions = moduleJars.files.associate { jar -> reportedVersionOf(jar) },
+            moduleSources = moduleSources.asFileTree.files.associate { file -> pathOf(file, root) to file.readText() },
+        ).verify()
+    }
+
+    // `Implementation-Title` names the module and `Implementation-Version` is the
+    // number its artifact reports; a jar without them reports nothing.
+    private fun reportedVersionOf(jar: File): Pair<String, String> =
+        JarFile(jar).use { archive ->
+            val attributes = archive.manifest?.mainAttributes
+            val module = attributes?.getValue("Implementation-Title") ?: jar.name
+            module to attributes?.getValue("Implementation-Version").orEmpty()
+        }
+
+    private fun pathOf(file: File, root: File): String =
+        try {
+            file.relativeTo(root).path
+        } catch (outsideTheRoot: IllegalArgumentException) {
+            file.path
+        }
+}
+
+// The root build hosts the version check, because the one property is the root
+// project's: every module inherits it from here, and the check reads the built
+// jars back to prove each module reports it.
+tasks.register<VerifyVersion>("verifyVersion") {
+    group = "verification"
+    description = "Refuses a module whose jar reports another version than gradle.properties holds, and a source file that restates it."
+    sourceVersion.set(project.version.toString())
+    rootDirectory.set(layout.projectDirectory)
+    moduleJars.from(subprojects.map { subproject -> subproject.tasks.named<Jar>("jar").flatMap { jar -> jar.archiveFile } })
+    moduleSources.from(subprojects.map { subproject -> subproject.file("src") })
+}
+tasks.named("check") { dependsOn("verifyVersion") }
+
+// ---------------------------------------------------------------------------
 // The fixtures: one declared violation per failure, and the refusal it must
 // produce. The fixture convention is a plain data list plus one task that runs
 // them, so a later check can add its own list and its own task.
@@ -640,7 +755,7 @@ val runtimeClasspathFixtures = listOf(
 class DependencyRuleFixtures(
     private val moduleDependencyFixtures: List<ModuleDependencyFixture>,
     private val runtimeClasspathFixtures: List<RuntimeClasspathFixture>,
-) {
+) : FixtureChecks() {
 
     fun count(): Int = moduleDependencyFixtures.size + runtimeClasspathFixtures.size
 
@@ -655,7 +770,7 @@ class DependencyRuleFixtures(
                     libraries = fixture.libraries,
                 ),
             )
-            expectedProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
         }
         runtimeClasspathFixtures.forEach { fixture ->
             val refusal = refusalOf(
@@ -666,29 +781,11 @@ class DependencyRuleFixtures(
                     mayCarryJavaFx = fixture.mayCarryJavaFx,
                 ),
             )
-            expectedProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
         }
         return problems
     }
 
-    private fun expectedProblem(problems: MutableList<String>, what: String, expected: String?, refusal: String?) {
-        when {
-            expected == null && refusal != null ->
-                problems.add("Fixture '$what' was refused, and it must be accepted: $refusal")
-            expected != null && refusal == null ->
-                problems.add("Fixture '$what' was accepted, and it must be refused with: $expected")
-            expected != null && refusal != null && !refusal.contains(expected) ->
-                problems.add("Fixture '$what' was refused with '$refusal', and the refusal must carry: $expected")
-        }
-    }
-
-    private fun refusalOf(rule: DependencyRule): String? =
-        try {
-            rule.verify()
-            null
-        } catch (refusal: GradleException) {
-            refusal.message
-        }
 }
 
 tasks.register("verifyDependencyRuleFixtures") {
@@ -710,3 +807,146 @@ tasks.register("verifyDependencyRuleFixtures") {
 // The fixtures are part of the suite: `check` runs them, so a rule that stops
 // refusing a declared violation breaks the build rather than going quiet.
 tasks.named("check") { dependsOn("verifyDependencyRuleFixtures") }
+
+// ---------------------------------------------------------------------------
+// The version and surface fixtures
+// ---------------------------------------------------------------------------
+
+/**
+ * A version declaration and the refusal it must produce: the version the
+ * property holds, the version each module's jar reports (empty for none), the
+ * text of each source file, and null when the rule must accept all of it.
+ */
+class VersionFixture(
+    val what: String,
+    val source: String,
+    val reportedVersions: Map<String, String>,
+    val moduleSources: Map<String, String>,
+    val expectedRefusal: String?,
+)
+
+// Each fixture is one case the version rule has to answer. The refusals are
+// written from the architecture's rule ("the version is one property, and every
+// module reports it"), not from the rule's code.
+val versionFixtures = listOf(
+    VersionFixture(
+        what = "a module reports another version",
+        source = "0.1.0",
+        reportedVersions = mapOf("contract" to "0.1.0", "client" to "0.2.0"),
+        moduleSources = mapOf(
+            "client/src/main/java/io/github/y4shin/workthread/client/WorkthreadApplication.java" to
+                "new Label(windowLabel())",
+        ),
+        expectedRefusal = "client's jar reports version 0.2.0, and gradle.properties says 0.1.0",
+    ),
+    VersionFixture(
+        what = "a module reports no version",
+        source = "0.1.0",
+        reportedVersions = mapOf("contract" to "0.1.0", "api" to ""),
+        moduleSources = mapOf(),
+        expectedRefusal = "api reports no version in its jar; every module reports the version in gradle.properties",
+    ),
+    VersionFixture(
+        what = "a source file restates the version",
+        source = "0.1.0",
+        reportedVersions = mapOf("client" to "0.1.0"),
+        moduleSources = mapOf(
+            "client/src/main/java/io/github/y4shin/workthread/client/WorkthreadApplication.java" to
+                "StackPane root = new StackPane(new Label(\"workthread 0.1.0\"));",
+        ),
+        expectedRefusal = "client/src/main/java/io/github/y4shin/workthread/client/WorkthreadApplication.java " +
+            "restates the version 0.1.0; gradle.properties is the one source",
+    ),
+    VersionFixture(
+        what = "every module reports the property's version",
+        source = "0.1.0",
+        reportedVersions = mapOf("contract" to "0.1.0", "client" to "0.1.0"),
+        moduleSources = mapOf(
+            "client/src/main/java/io/github/y4shin/workthread/client/WorkthreadApplication.java" to
+                "new Label(windowLabel())",
+        ),
+        expectedRefusal = null,
+    ),
+    VersionFixture(
+        what = "a source file carries another number",
+        source = "0.1.0",
+        reportedVersions = mapOf("client" to "0.1.0"),
+        moduleSources = mapOf(
+            "client/src/main/java/io/github/y4shin/workthread/client/WorkthreadApplication.java" to
+                "// 1024x768, measured on 2026-11-23",
+        ),
+        expectedRefusal = null,
+    ),
+)
+
+/**
+ * Runs the version and surface fixtures, and reports the ones whose rule did not
+ * answer as the fixture says. One runner for this ticket's fixtures: each list
+ * is plain data, so a later ticket adds its own list and its own runner.
+ */
+class VersionAndSurfaceFixtures(private val versionFixtures: List<VersionFixture>) : FixtureChecks() {
+
+    fun count(): Int = versionFixtures.size
+
+    fun problems(): List<String> {
+        val problems = mutableListOf<String>()
+        versionFixtures.forEach { fixture ->
+            val refusal = refusalOf(
+                VersionRule(
+                    source = fixture.source,
+                    reportedVersions = fixture.reportedVersions,
+                    moduleSources = fixture.moduleSources,
+                ),
+            )
+            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        return problems
+    }
+}
+
+/**
+ * One fixture's disagreement with its rule. A base class rather than a top-level
+ * function, because a script-level function pulls the build script into every
+ * object that calls it, and the configuration cache cannot serialize that.
+ */
+abstract class FixtureChecks {
+
+    /** The refusal a rule produces, or null when it accepts what it was given. */
+    protected fun refusalOf(rule: DependencyRule): String? =
+        try {
+            rule.verify()
+            null
+        } catch (refusal: GradleException) {
+            refusal.message
+        }
+
+    /** Adds the problem, worded so the failure names the fixture and what was expected. */
+    protected fun fixtureProblem(problems: MutableList<String>, what: String, expected: String?, refusal: String?) {
+        when {
+            expected == null && refusal != null ->
+                problems.add("Fixture '$what' was refused, and it must be accepted: $refusal")
+            expected != null && refusal == null ->
+                problems.add("Fixture '$what' was accepted, and it must be refused with: $expected")
+            expected != null && refusal != null && !refusal.contains(expected) ->
+                problems.add("Fixture '$what' was refused with '$refusal', and the refusal must carry: $expected")
+        }
+    }
+}
+
+tasks.register("verifyVersionAndSurfaceFixtures") {
+    group = "verification"
+    description = "Proves the version rule refuses a module that reports another version or a source that restates it."
+    // Plain data, built here so the action holds no reference to the build script.
+    val fixtures = VersionAndSurfaceFixtures(versionFixtures)
+    doLast {
+        val problems = fixtures.problems()
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "The version and surface fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
+            )
+        }
+        println("${fixtures.count()} version and surface fixtures held")
+    }
+}
+
+tasks.named("check") { dependsOn("verifyVersionAndSurfaceFixtures") }
