@@ -14,3 +14,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+
+      # Ubuntu and Windows default to Java 17 and jlink links the JDK's own
+      # modules, so the patch is pinned: three legs that link three patches ship
+      # three different images.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21.0.13'
+
+      # Restores the Gradle user home and validates the wrapper, so the pipeline
+      # needs no wrapper-validation step of its own.
+      - uses: gradle/actions/setup-gradle@v6

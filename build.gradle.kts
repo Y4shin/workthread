@@ -1347,12 +1347,55 @@ class CiPipelineRule(
         val body = bodyOf(lines)
         val violations = mutableListOf<String>()
         checkRunnerLabels(body, violations)
+        checkToolchain(body, violations)
         return violations
     }
 
     /** The workflow's lines with their comments removed, so a sentence is not a step. */
     private fun bodyOf(lines: List<String>): List<String> =
         lines.map { line -> line.substringBefore('#').trimEnd() }.filter { line -> line.isNotEmpty() }
+
+    /**
+     * The JDK the leg builds with, and the Gradle user home the next run restores.
+     * The patch is pinned, not the major version: `jlink` links the JDK's own
+     * modules, so a floating patch links a different image on each leg.
+     */
+    private fun checkToolchain(body: List<String>, violations: MutableList<String>) {
+        val javaStep = stepLines(body, "actions/setup-java")
+        if (javaStep == null) {
+            violations.add("the pipeline sets up no JDK; ubuntu and windows default to Java 17, and jlink links the JDK the leg runs")
+        } else {
+            if (javaStep.none { line -> line.contains("distribution: temurin") }) {
+                violations.add("the pipeline's JDK step names no Temurin distribution; the image is linked from that JDK")
+            }
+            if (javaStep.none { line -> PINNED_JDK.containsMatchIn(line) }) {
+                violations.add("the pipeline's JDK step names no 21.0.13; an unpinned patch links a different image on each leg")
+            }
+        }
+        if (body.none { line -> line.contains("gradle/actions/setup-gradle") }) {
+            violations.add(
+                "the pipeline uses no gradle/actions/setup-gradle; " +
+                    "it validates the wrapper and restores the Gradle user home, so a wrapper-validation step of its own is redundant",
+            )
+        }
+    }
+
+    /**
+     * One step of the workflow: the line that names the action and the lines
+     * indented under it. A step ends where the next line indents no deeper, which
+     * is where the next step begins.
+     */
+    private fun stepLines(body: List<String>, action: String): List<String>? {
+        val start = body.indexOfFirst { line -> line.contains(action) }
+        if (start < 0) {
+            return null
+        }
+        val indent = indentOf(body[start])
+        val end = (start + 1 until body.size).firstOrNull { index -> indentOf(body[index]) <= indent } ?: body.size
+        return body.subList(start, end)
+    }
+
+    private fun indentOf(line: String): Int = line.length - line.trimStart().length
 
     private fun checkRunnerLabels(body: List<String>, violations: MutableList<String>) {
         val legs = RUNNER_LABELS.joinToString(separator = ", ")
@@ -1373,6 +1416,7 @@ class CiPipelineRule(
         const val PATH = ".github/workflows/ci.yml"
         val RUNNER_LABELS = listOf("ubuntu-24.04", "macos-26", "windows-2025")
         val FLOATING_RUNNER_LABEL = Regex("(ubuntu|macos|windows)-latest")
+        val PINNED_JDK = Regex("java-version:\\s*['\"]?21\\.0\\.13['\"]?")
     }
 }
 
@@ -1430,6 +1474,32 @@ val ciPipelineFixtures = listOf(
         what = "a floating runner label",
         lines = listOf("    runs-on: ubuntu-latest"),
         expectedRefusal = "the pipeline runs on ubuntu-latest; a -latest label moves the OS baseline, and the JavaFX classifier with it",
+    ),
+    CiPipelineFixture(
+        what = "no JDK step",
+        lines = listOf("      - uses: actions/checkout@v7"),
+        expectedRefusal = "the pipeline sets up no JDK; ubuntu and windows default to Java 17, and jlink links the JDK the leg runs",
+    ),
+    CiPipelineFixture(
+        what = "an unpinned JDK patch",
+        lines = listOf(
+            "      - uses: actions/setup-java@v6",
+            "        with:",
+            "          distribution: temurin",
+            "          java-version: '21'",
+        ),
+        expectedRefusal = "the pipeline's JDK step names no 21.0.13; an unpinned patch links a different image on each leg",
+    ),
+    CiPipelineFixture(
+        what = "no Gradle setup step",
+        lines = listOf(
+            "      - uses: actions/setup-java@v6",
+            "        with:",
+            "          distribution: temurin",
+            "          java-version: '21.0.13'",
+        ),
+        expectedRefusal = "the pipeline uses no gradle/actions/setup-gradle; " +
+            "it validates the wrapper and restores the Gradle user home, so a wrapper-validation step of its own is redundant",
     ),
 )
 
