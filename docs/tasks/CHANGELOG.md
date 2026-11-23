@@ -11,6 +11,15 @@ title: Task Changelog
 
 
 
+
+## 2026-11-23, Record the manual launch check on each platform (manual-launch-check)
+
+The launch check now runs against the images the pipeline builds. `docs/dev-env.md` records the three artifacts, their unpacked sizes, and both launchers, `bin/workthread` and `bin/workthread.bat`.
+
+Result: Linux is verified. The `image-ubuntu-24.04` artifact from run 45089591551 opens a 1024x768 window titled `workthread` with one centred label reading `workthread 0.1.0`, run inside an `ubuntu:24.04` container. macOS and Windows were not launched and stay unverified, by the operator's decision.
+
+Two findings recorded: this NixOS host cannot launch a Temurin-linked image directly, because the store GTK needs a newer glibc than the image's loader resolves; and the macOS leg linked JDK 21.0.13.1 while the other two linked 21.0.13, so the pinned patch does not hold on all legs.
+
 ## 2026-11-23, Build and package on three platforms in CI (three-platform-ci)
 
 `.github/workflows/ci.yml` builds and packages on `ubuntu-24.04`, `macos-26`, and `windows-2025`. Each leg sets up Temurin 21.0.13, lets `gradle/actions/setup-gradle` restore the Gradle home and validate the wrapper, runs `./gradlew build` and `./gradlew :client:jlink`, then uploads the image as an artifact kept seven days.
