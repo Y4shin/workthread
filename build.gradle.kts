@@ -639,8 +639,8 @@ class ApiSurfaceRule(
  * version property. The jar is read rather than the build script, because the
  * artifact is where a consumer reads a module's version.
  *
- * <p>`reportedVersions` holds the number each jar reports, and an empty string
- * for a jar that reports none: a map cannot hold a missing value, and "reports
+ * `reportedVersions` holds the number each jar reports, and an empty string for
+ * a jar that reports none: a map cannot hold a missing value, and "reports
  * nothing" is a refusal of its own.
  */
 abstract class VerifyVersion : DefaultTask() {
@@ -710,10 +710,10 @@ tasks.named("check") { dependsOn("verifyVersion") }
  * protected types and members in them, one element per line as
  * `<element>` TAB `<shape>`.
  *
- * <p>The text is the committed snapshot's format, so a review reads a change to
- * the API as a diff and the comparison runs on strings. Only public and
- * protected members are the surface: a private constructor or a package-private
- * type is the module's own business, not a promise to its consumers.
+ * The text is the committed snapshot's format, so a review reads a change to the
+ * API as a diff and the comparison runs on strings. Only public and protected
+ * members are the surface: a private constructor or a package-private type is
+ * the module's own business, not a promise to its consumers.
  */
 object ExportedSurface {
 
