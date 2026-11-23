@@ -77,10 +77,14 @@ Measured facts:
 
 | Fact | Value |
 | --- | --- |
-| Image size, Linux x86_64 | 67 611 290 bytes (64.5 MiB, 67.6 MB); `du -sh` reports 65M |
+| Image size, Linux x86_64 | 67 612 510 bytes (64.5 MiB, 67.6 MB); `du -sh` reports 65M |
 | Modules in the image | `java.base` plus `java.desktop`, `java.xml`, `java.prefs`, `java.datatransfer`, `jdk.unsupported`, `jdk.jfr`, `javafx.base`, `javafx.controls` and `javafx.graphics` at 21.0.13, and `io.github.y4shin.workthread.client`, `.contract`, `.wiring` |
 | Launcher command | `"$DIR/java" $CDS_JVM_OPTS -p "$DIR/../app" -m io.github.y4shin.workthread.client/io.github.y4shin.workthread.client.WorkthreadApplication` |
 | Configuration cache | reuse on a second `:client:jlink`; no Gradle warning in `build` or `jlink` with `--warning-mode all` |
+
+The size is measured after the window's label took its version from the build:
+the client module carries the generated `workthread-version.properties`, which is
+1 220 bytes more than the image measured before the label read it.
 
 The launcher points at `$DIR/../app`, which does not exist inside the image:
 the application module lives in `lib/modules` and the launcher works anyway.

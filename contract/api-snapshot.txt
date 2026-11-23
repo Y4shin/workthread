@@ -1,0 +1,10 @@
+# The contract module's exported surface: every exported package, and the
+# public and protected types and members in it, one element per line as
+# `<element>` TAB `<shape>`.
+#
+# `./gradlew check` compares this file with the built contract jar and fails
+# when an element disappears or changes shape. `./gradlew
+# generateContractApiSnapshot` rewrites it after a change the release means
+# to ship, and the diff is then the review.
+package io.github.y4shin.workthread.contract	exported
+type io.github.y4shin.workthread.contract.ContractPlaceholder	public final class extends java.lang.Object

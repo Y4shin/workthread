@@ -14,6 +14,8 @@ before naming anything, and treat it as the glossary.
   ruled out. Read it before proposing work that was already rejected.
 - `docs/adr/` holds decisions that are hard to reverse, surprising, and a real
   trade-off. Most decisions are not ADR-worthy.
+- `docs/releasing.md` holds the release ritual: the one version source, who tags
+  and when, the annotated tag convention, and the contract API snapshot.
 - `docs/bugs/` is a static archive and is not scaffolded. A bug enters as an
   effort, not as a file there.
 

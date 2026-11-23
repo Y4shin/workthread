@@ -12,18 +12,24 @@ import javafx.stage.Stage;
  * window is how the linked runtime is observed rather than described.
  *
  * <p>The window is the ticket's fixed shape: the title {@code workthread}, a
- * 1024x768 scene, and one centred label reading {@code workthread 0.1.0}. The
- * label's text is the window's content, not a second version source; the
- * project version stays in {@code gradle.properties}.
+ * 1024x768 scene, and one centred label reading {@code workthread <version>}.
+ * The label takes its number from {@link WorkthreadVersion}, which reads the
+ * resource Gradle generates from {@code gradle.properties}; this class holds no
+ * copy of the version.
  */
 public final class WorkthreadApplication extends Application {
 
     @Override
     public void start(Stage stage) {
-        StackPane root = new StackPane(new Label("workthread 0.1.0"));
+        StackPane root = new StackPane(new Label(windowLabel()));
         stage.setTitle("workthread");
         stage.setScene(new Scene(root, 1024, 768));
         stage.show();
+    }
+
+    // The window's one line of text: the title word and the build's version.
+    static String windowLabel() {
+        return "workthread " + WorkthreadVersion.value();
     }
 
     // One entry point, so the launcher runs this class the same way whether it
