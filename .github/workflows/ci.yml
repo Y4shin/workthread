@@ -1,0 +1,64 @@
+# The pipeline builds and packages the client on the three platforms the promise
+# names. Each leg runs on its own host and nothing cross-builds, so the OS the
+# JavaFX plugin sees is the OS the image is for.
+name: ci
+
+# Every push to main, every pull request, and a manual run: a patch has to meet
+# the pipeline, and a rerun must not need a commit.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only. The build reads the checkout, and the artifact upload uses the run's
+# own token; the first run is what confirms it needs nothing wider.
+permissions:
+  contents: read
+
+# A newer commit supersedes the run before it, and the superseded leg stops
+# rather than burning runner minutes for a result nobody reads.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # One leg per platform, and one leg failing does not cancel the others: the
+    # three legs are the platform seam, and a green run means all three.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-26, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Ubuntu and Windows default to Java 17 and jlink links the JDK's own
+      # modules, so the patch is pinned: three legs that link three patches ship
+      # three different images.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21.0.13'
+
+      # Restores the Gradle user home and validates the wrapper, so the pipeline
+      # needs no wrapper-validation step of its own.
+      - uses: gradle/actions/setup-gradle@v6
+
+      # The build every later effort meets, with every check riding it; then the
+      # one packaging command. Nothing here starts a toolkit: no Xvfb, no GTK, no
+      # jpackage, because the build links the image and the checks are
+      # toolkit-free. The launch check happens by hand, on each platform.
+      - run: ./gradlew build
+      - run: ./gradlew :client:jlink
+
+      # The image, one artifact per leg, kept a week: a downloaded artifact has
+      # lost its permissions, so it is evidence for the manual launch check and
+      # not the delivered image.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: image-${{ matrix.os }}
+          path: client/build/image/
+          retention-days: 7
+          if-no-files-found: error

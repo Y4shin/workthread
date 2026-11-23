@@ -1,0 +1,34 @@
+# The only place a library or plugin version appears. A subproject declares
+# coordinates without versions.
+
+[versions]
+junit = "5.14.4"
+assertj = "3.27.7"
+javafx = "21.0.13"
+spring-boot = "4.2.0"
+mcp-sdk = "2.1.0"
+sqlite-jdbc = "3.54.1.0"
+
+[libraries]
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+# The platform supplies the versions of the Spring Boot artifacts below; the
+# two coordinates carry none of their own.
+springBootBom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+springBootStarterWebmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+# The aggregator carries no code; the JSON mapper is declared explicitly
+# because the SDK does not choose a mapper for its consumer.
+mcpSdk = { module = "io.modelcontextprotocol.sdk:mcp", version.ref = "mcp-sdk" }
+mcpJsonJackson3 = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson3", version.ref = "mcp-sdk" }
+# Pinned above the Spring Boot BOM's 3.53.4.0, which reaches only `api`.
+sqliteJdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+
+[plugins]
+# The JavaFX plugin owns the JavaFX coordinates and the host's platform
+# classifier; the client never declares a JavaFX jar by hand.
+javafx = { id = "org.openjfx.javafxplugin", version = "0.1.0" }
+# The jlink plugin owns the runtime image and its launcher; there is no second
+# image tool.
+jlink = { id = "org.beryx.jlink", version = "4.2.0" }

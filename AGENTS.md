@@ -14,6 +14,8 @@ before naming anything, and treat it as the glossary.
   ruled out. Read it before proposing work that was already rejected.
 - `docs/adr/` holds decisions that are hard to reverse, surprising, and a real
   trade-off. Most decisions are not ADR-worthy.
+- `docs/releasing.md` holds the release ritual: the one version source, who tags
+  and when, the annotated tag convention, and the contract API snapshot.
 - `docs/bugs/` is a static archive and is not scaffolded. A bug enters as an
   effort, not as a file there.
 
@@ -45,7 +47,11 @@ with the API between daemon and client. Logic that belongs to the work goes in
 the core, not in the API or the client, or standalone mode will need a fork of
 it.
 
-The modules are not scaffolded yet.
+The build has eight modules: `contract`, `core`, `adapters`, `wiring`, `cli`,
+`mcp`, `api`, and `client`. The edge table saying what each may depend on is
+declared once in `settings.gradle.kts`, and the build refuses a dependency or a
+module descriptor that leaves it. A new module requires an architecture change
+first.
 
 ## Writing
 
