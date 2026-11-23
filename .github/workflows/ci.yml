@@ -31,3 +31,13 @@ jobs:
       # one packaging command. Nothing starts a toolkit, so no display is set up.
       - run: ./gradlew build
       - run: ./gradlew :client:jlink
+
+      # The image, one artifact per leg, kept a week: a downloaded artifact has
+      # lost its permissions, so it is evidence for the manual launch check and
+      # not the delivered image.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: image-${{ matrix.os }}
+          path: client/build/image/
+          retention-days: 7
+          if-no-files-found: error

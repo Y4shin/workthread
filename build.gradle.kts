@@ -1349,7 +1349,34 @@ class CiPipelineRule(
         checkRunnerLabels(body, violations)
         checkToolchain(body, violations)
         checkPipelineSteps(body, violations)
+        checkUploadedImages(body, violations)
         return violations
+    }
+
+    /**
+     * The image, uploaded per leg and kept for a week. A delivered artifact loses
+     * its permissions, so it is evidence for inspection and for the manual launch
+     * check, not the shipped image; three images per run still run out the storage
+     * allowance, which is what the short retention is for.
+     */
+    private fun checkUploadedImages(body: List<String>, violations: MutableList<String>) {
+        val upload = stepLines(body, "actions/upload-artifact")
+        if (upload == null) {
+            violations.add("the pipeline uploads no image; the three artifacts are what the manual launch checks download")
+            return
+        }
+        if (upload.none { line -> line.contains("path: client/build/image") }) {
+            violations.add("the artifact upload does not point at client/build/image; that directory is the image")
+        }
+        if (upload.none { line -> line.contains("retention-days: 7") }) {
+            violations.add("the artifact upload keeps no seven days; three images per run exhaust the free storage otherwise")
+        }
+        if (upload.none { line -> line.contains("name: image-") && line.contains("matrix.os") }) {
+            violations.add("the artifact upload names no per-leg artifact; three legs with one name upload one artifact")
+        }
+        if (upload.none { line -> line.contains("if-no-files-found: error") }) {
+            violations.add("the artifact upload tolerates a missing image; if-no-files-found: error fails the leg instead of shipping nothing")
+        }
     }
 
     /**
@@ -1524,6 +1551,59 @@ val ciPipelineFixtures = listOf(
         what = "no client image task",
         lines = listOf("      - run: ./gradlew build"),
         expectedRefusal = "the pipeline runs no ./gradlew :client:jlink; each leg builds its own image, and nothing cross-builds",
+    ),
+    CiPipelineFixture(
+        what = "no artifact upload",
+        lines = listOf("      - run: ./gradlew build", "      - run: ./gradlew :client:jlink"),
+        expectedRefusal = "the pipeline uploads no image; the three artifacts are what the manual launch checks download",
+    ),
+    CiPipelineFixture(
+        what = "the artifact upload points at another directory",
+        lines = listOf(
+            "      - uses: actions/upload-artifact@v7",
+            "        with:",
+            "          name: image-\${{ matrix.os }}",
+            "          path: client/build/libs/",
+            "          retention-days: 7",
+            "          if-no-files-found: error",
+        ),
+        expectedRefusal = "the artifact upload does not point at client/build/image; that directory is the image",
+    ),
+    CiPipelineFixture(
+        what = "the artifacts are kept for ninety days",
+        lines = listOf(
+            "      - uses: actions/upload-artifact@v7",
+            "        with:",
+            "          name: image-\${{ matrix.os }}",
+            "          path: client/build/image/",
+            "          retention-days: 90",
+            "          if-no-files-found: error",
+        ),
+        expectedRefusal = "the artifact upload keeps no seven days; three images per run exhaust the free storage otherwise",
+    ),
+    CiPipelineFixture(
+        what = "three legs upload one artifact name",
+        lines = listOf(
+            "      - uses: actions/upload-artifact@v7",
+            "        with:",
+            "          name: image",
+            "          path: client/build/image/",
+            "          retention-days: 7",
+            "          if-no-files-found: error",
+        ),
+        expectedRefusal = "the artifact upload names no per-leg artifact; three legs with one name upload one artifact",
+    ),
+    CiPipelineFixture(
+        what = "the upload tolerates a missing image",
+        lines = listOf(
+            "      - uses: actions/upload-artifact@v7",
+            "        with:",
+            "          name: image-\${{ matrix.os }}",
+            "          path: client/build/image/",
+            "          retention-days: 7",
+            "          if-no-files-found: warn",
+        ),
+        expectedRefusal = "the artifact upload tolerates a missing image; if-no-files-found: error fails the leg instead of shipping nothing",
     ),
 )
 
