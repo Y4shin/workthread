@@ -35,3 +35,44 @@ dependencies {
     implementation(project(":contract"))
     implementation(project(":wiring"))
 }
+
+// The version reaches the window the same way it reaches every jar: Gradle
+// writes it from the one property in `gradle.properties`. The client reads a
+// generated resource, so no source file restates the number and the label
+// cannot drift when the version moves.
+val generateVersionResource = tasks.register<GenerateVersionResource>("generateVersionResource") {
+    version.set(project.version.toString())
+    outputDirectory.set(layout.buildDirectory.dir("generated/version-resources"))
+}
+
+sourceSets {
+    main {
+        resources.srcDir(generateVersionResource)
+    }
+}
+
+// The suite compares the label against the build's own version, so the one
+// source's value is a task input rather than a copy in the test.
+tasks.named<Test>("test") {
+    systemProperty("workthread.version", project.version)
+}
+
+/**
+ * Writes the window's version resource from the one version property, so the
+ * client reads the build's number instead of carrying a copy of it.
+ */
+abstract class GenerateVersionResource : DefaultTask() {
+
+    @get:Input
+    abstract val version: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun writeVersionResource() {
+        val resource = outputDirectory.get().file("workthread-version.properties").asFile
+        resource.parentFile.mkdirs()
+        resource.writeText("version=${version.get()}\n")
+    }
+}
