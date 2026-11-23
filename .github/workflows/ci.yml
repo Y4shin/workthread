@@ -26,3 +26,8 @@ jobs:
       # Restores the Gradle user home and validates the wrapper, so the pipeline
       # needs no wrapper-validation step of its own.
       - uses: gradle/actions/setup-gradle@v6
+
+      # The build every later effort meets, with every check riding it; then the
+      # one packaging command. Nothing starts a toolkit, so no display is set up.
+      - run: ./gradlew build
+      - run: ./gradlew :client:jlink

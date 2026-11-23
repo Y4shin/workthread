@@ -1348,7 +1348,21 @@ class CiPipelineRule(
         val violations = mutableListOf<String>()
         checkRunnerLabels(body, violations)
         checkToolchain(body, violations)
+        checkPipelineSteps(body, violations)
         return violations
+    }
+
+    /**
+     * The two commands every leg runs: the build, which carries every check, and
+     * the client's image task, which is the packaging artifact.
+     */
+    private fun checkPipelineSteps(body: List<String>, violations: MutableList<String>) {
+        if (body.none { line -> line.contains("./gradlew build") }) {
+            violations.add("the pipeline runs no ./gradlew build; the build is the gate every leg meets, and every check rides it")
+        }
+        if (body.none { line -> line.contains(":client:jlink") }) {
+            violations.add("the pipeline runs no ./gradlew :client:jlink; each leg builds its own image, and nothing cross-builds")
+        }
     }
 
     /** The workflow's lines with their comments removed, so a sentence is not a step. */
@@ -1500,6 +1514,16 @@ val ciPipelineFixtures = listOf(
         ),
         expectedRefusal = "the pipeline uses no gradle/actions/setup-gradle; " +
             "it validates the wrapper and restores the Gradle user home, so a wrapper-validation step of its own is redundant",
+    ),
+    CiPipelineFixture(
+        what = "no build step",
+        lines = listOf("      - uses: actions/checkout@v7"),
+        expectedRefusal = "the pipeline runs no ./gradlew build; the build is the gate every leg meets, and every check rides it",
+    ),
+    CiPipelineFixture(
+        what = "no client image task",
+        lines = listOf("      - run: ./gradlew build"),
+        expectedRefusal = "the pipeline runs no ./gradlew :client:jlink; each leg builds its own image, and nothing cross-builds",
     ),
 )
 
