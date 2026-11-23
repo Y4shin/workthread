@@ -1461,6 +1461,43 @@ class CiPipelineRule(
     }
 }
 
+/**
+ * The prerequisites the pipeline must not need. Nothing in the pipeline launches
+ * the client: the build links the image, the checks are toolkit-free, and the
+ * launch happens by hand. Xvfb, GTK, and jpackage would only appear if something
+ * started a toolkit or built an installer.
+ *
+ * A comment is not a step, so the workflow can say why it needs none of them
+ * without this rule reading that sentence as a step.
+ */
+class ForbiddenCiStepRule(private val lines: List<String>?) : DependencyRule() {
+
+    override fun violations(): List<String> {
+        // A missing workflow is the pipeline rule's refusal, and there is nothing
+        // here to read.
+        val body = (lines ?: listOf())
+            .map { line -> line.substringBefore('#').trimEnd() }
+            .filter { line -> line.isNotEmpty() }
+        return FORBIDDEN_STEPS
+            .filter { (token, _) -> body.any { line -> line.contains(token, ignoreCase = true) } }
+            .map { (_, reason) -> "the pipeline $reason" }
+    }
+
+    companion object {
+        // Each token names the tool and the reason it does not belong. `wix` is
+        // the Windows installer toolchain, `fakeroot` and `dpkg-deb` the Linux
+        // one: all three serve jpackage, and the pipeline builds an image.
+        val FORBIDDEN_STEPS = listOf(
+            "xvfb" to "uses xvfb; nothing in the pipeline launches a toolkit, so a display is not needed",
+            "gtk" to "installs GTK; JavaFX needs it only when the toolkit initialises, and nothing in the pipeline launches",
+            "jpackage" to "uses jpackage; the jlink image is the shipping artifact and the pipeline builds no installer",
+            "fakeroot" to "provisions fakeroot; that is a jpackage installer prerequisite, and the pipeline builds an image",
+            "dpkg-deb" to "provisions dpkg-deb; that is a jpackage installer prerequisite, and the pipeline builds an image",
+            "wix" to "provisions wix; that is a jpackage installer prerequisite, and the pipeline builds an image",
+        )
+    }
+}
+
 /** The committed workflow file, checked as the pipeline it declares. */
 abstract class VerifyCiWorkflow : DefaultTask() {
 
@@ -1471,10 +1508,9 @@ abstract class VerifyCiWorkflow : DefaultTask() {
     @TaskAction
     fun verifyPipeline() {
         val file = workflow.files.singleOrNull()
-        CiPipelineRule(
-            path = CiPipelineRule.PATH,
-            lines = file?.takeIf { existing -> existing.exists() }?.readLines(),
-        ).verify()
+        val lines = file?.takeIf { existing -> existing.exists() }?.readLines()
+        CiPipelineRule(path = CiPipelineRule.PATH, lines = lines).verify()
+        ForbiddenCiStepRule(lines = lines).verify()
     }
 }
 
@@ -1607,17 +1643,64 @@ val ciPipelineFixtures = listOf(
     ),
 )
 
+/**
+ * A workflow fragment and the refusal it must produce, or null when the fragment
+ * is permitted. The comment case is the permitted one: the workflow may say why
+ * it needs no display, and a sentence is not a step.
+ */
+class ForbiddenCiStepFixture(
+    val what: String,
+    val lines: List<String>,
+    val expectedRefusal: String?,
+)
+
+val forbiddenCiStepFixtures = listOf(
+    ForbiddenCiStepFixture(
+        what = "a display server is installed",
+        lines = listOf("      - run: sudo apt-get install -y xvfb"),
+        expectedRefusal = "the pipeline uses xvfb; nothing in the pipeline launches a toolkit, so a display is not needed",
+    ),
+    ForbiddenCiStepFixture(
+        what = "the GTK libraries are installed",
+        lines = listOf("      - run: sudo apt-get install -y libgtk-3-0"),
+        expectedRefusal = "the pipeline installs GTK; JavaFX needs it only when the toolkit initialises, and nothing in the pipeline launches",
+    ),
+    ForbiddenCiStepFixture(
+        what = "an installer is built",
+        lines = listOf("      - run: jpackage --type deb --input client/build/image"),
+        expectedRefusal = "the pipeline uses jpackage; the jlink image is the shipping artifact and the pipeline builds no installer",
+    ),
+    ForbiddenCiStepFixture(
+        what = "an installer prerequisite is provisioned",
+        lines = listOf("      - run: sudo apt-get install -y fakeroot dpkg-deb"),
+        expectedRefusal = "the pipeline provisions fakeroot; that is a jpackage installer prerequisite, and the pipeline builds an image",
+    ),
+    ForbiddenCiStepFixture(
+        what = "a comment names the steps the pipeline does not run",
+        lines = listOf(
+            "# Nothing here starts a toolkit: no Xvfb, no GTK, no jpackage.",
+            "      - uses: actions/checkout@v7",
+        ),
+        expectedRefusal = null,
+    ),
+)
+
 /** Runs the pipeline fixtures and reports the ones whose rule did not answer as the fixture says. */
 class CiWorkflowFixtures(
     private val ciPipelineFixtures: List<CiPipelineFixture>,
+    private val forbiddenCiStepFixtures: List<ForbiddenCiStepFixture>,
 ) : FixtureChecks() {
 
-    fun count(): Int = ciPipelineFixtures.size
+    fun count(): Int = ciPipelineFixtures.size + forbiddenCiStepFixtures.size
 
     fun problems(): List<String> {
         val problems = mutableListOf<String>()
         ciPipelineFixtures.forEach { fixture ->
             val refusal = refusalOf(CiPipelineRule(path = CiPipelineRule.PATH, lines = fixture.lines))
+            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        forbiddenCiStepFixtures.forEach { fixture ->
+            val refusal = refusalOf(ForbiddenCiStepRule(lines = fixture.lines))
             fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
         }
         return problems
@@ -1626,9 +1709,9 @@ class CiWorkflowFixtures(
 
 tasks.register("verifyCiWorkflowFixtures") {
     group = "verification"
-    description = "Proves the pipeline rule refuses a dropped leg and a floating runner label with a message that names them."
+    description = "Proves the pipeline rules refuse a dropped leg, a floating label, an unpinned JDK, a missing image upload, or a display step, with messages that name them."
     // Plain data, so the action needs no reference to the build script itself.
-    val fixtures = CiWorkflowFixtures(ciPipelineFixtures)
+    val fixtures = CiWorkflowFixtures(ciPipelineFixtures, forbiddenCiStepFixtures)
     doLast {
         val problems = fixtures.problems()
         if (problems.isNotEmpty()) {

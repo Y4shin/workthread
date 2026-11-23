@@ -28,7 +28,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       # The build every later effort meets, with every check riding it; then the
-      # one packaging command. Nothing starts a toolkit, so no display is set up.
+      # one packaging command. Nothing here starts a toolkit: no Xvfb, no GTK, no
+      # jpackage, because the build links the image and the checks are
+      # toolkit-free. The launch check happens by hand, on each platform.
       - run: ./gradlew build
       - run: ./gradlew :client:jlink
 
