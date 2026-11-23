@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Start 0.1.0 and the contract API snapshot
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - named-modules
 size: m
