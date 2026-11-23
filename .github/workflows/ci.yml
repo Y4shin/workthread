@@ -1,0 +1,16 @@
+# The pipeline builds and packages the client on the three platforms the promise
+# names. Each leg runs on its own host and nothing cross-builds, so the OS the
+# JavaFX plugin sees is the OS the image is for.
+name: ci
+
+jobs:
+  build:
+    # One leg per platform, and one leg failing does not cancel the others: the
+    # three legs are the platform seam, and a green run means all three.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-26, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7

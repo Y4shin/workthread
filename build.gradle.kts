@@ -1318,3 +1318,152 @@ tasks.register("verifyVersionAndSurfaceFixtures") {
 }
 
 tasks.named("check") { dependsOn("verifyVersionAndSurfaceFixtures") }
+
+// ---------------------------------------------------------------------------
+// The pipeline: `.github/workflows/ci.yml` is the pipeline, so the check reads
+// it as the committed file rather than trusting a description of it.
+// ---------------------------------------------------------------------------
+
+/**
+ * The pipeline's shape, read from the committed workflow file: three pinned
+ * legs, an explicit JDK, the build, the client image task, the uploaded images,
+ * and the run policy that keeps a superseded run from burning minutes. The
+ * architecture's CI section is the source of every refusal, and a refusal names
+ * what the workflow must carry.
+ *
+ * A comment is not a step: the body is read with its comments removed, so the
+ * workflow can say why it needs no display without the check reading that
+ * sentence as a step.
+ */
+class CiPipelineRule(
+    private val path: String,
+    private val lines: List<String>?,
+) : DependencyRule() {
+
+    override fun violations(): List<String> {
+        if (lines == null) {
+            return listOf("$path is missing; the pipeline is a committed workflow file, and three legs build from it")
+        }
+        val body = bodyOf(lines)
+        val violations = mutableListOf<String>()
+        checkRunnerLabels(body, violations)
+        return violations
+    }
+
+    /** The workflow's lines with their comments removed, so a sentence is not a step. */
+    private fun bodyOf(lines: List<String>): List<String> =
+        lines.map { line -> line.substringBefore('#').trimEnd() }.filter { line -> line.isNotEmpty() }
+
+    private fun checkRunnerLabels(body: List<String>, violations: MutableList<String>) {
+        val legs = RUNNER_LABELS.joinToString(separator = ", ")
+        RUNNER_LABELS.filterNot { label -> body.any { line -> line.contains(label) } }.forEach { label ->
+            violations.add("the pipeline's matrix carries no $label; the three legs are $legs, pinned to exact labels")
+        }
+        if (body.none { line -> line.contains("runs-on: \${{ matrix.os }}") }) {
+            violations.add("the pipeline's job runs on no matrix label; the three labels are three hosts only if the job runs on them")
+        }
+        body.forEach { line ->
+            FLOATING_RUNNER_LABEL.find(line)?.let { floating ->
+                violations.add("the pipeline runs on ${floating.value}; a -latest label moves the OS baseline, and the JavaFX classifier with it")
+            }
+        }
+    }
+
+    companion object {
+        const val PATH = ".github/workflows/ci.yml"
+        val RUNNER_LABELS = listOf("ubuntu-24.04", "macos-26", "windows-2025")
+        val FLOATING_RUNNER_LABEL = Regex("(ubuntu|macos|windows)-latest")
+    }
+}
+
+/** The committed workflow file, checked as the pipeline it declares. */
+abstract class VerifyCiWorkflow : DefaultTask() {
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val workflow: ConfigurableFileCollection
+
+    @TaskAction
+    fun verifyPipeline() {
+        val file = workflow.files.singleOrNull()
+        CiPipelineRule(
+            path = CiPipelineRule.PATH,
+            lines = file?.takeIf { existing -> existing.exists() }?.readLines(),
+        ).verify()
+    }
+}
+
+// The workflow is the pipeline's only committed artifact, so the check reads it
+// from the root project: a leg runs `./gradlew build`, and this check rides it.
+val ciWorkflow = rootProject.file(CiPipelineRule.PATH)
+
+tasks.register<VerifyCiWorkflow>("verifyCiWorkflow") {
+    group = "verification"
+    description = "Refuses a workflow file that drops a pinned leg, a floating runner label, an explicit JDK, the build, the image task, or the uploaded images."
+    workflow.from(ciWorkflow)
+}
+tasks.named("check") { dependsOn("verifyCiWorkflow") }
+
+/**
+ * A workflow fragment and the refusal it must produce. The accepted side of the
+ * pipeline rule is the committed file itself, which `verifyCiWorkflow` reads: a
+ * fragment cannot stand in for a whole pipeline, and a second copy of the real
+ * workflow in the build script would drift from it.
+ */
+class CiPipelineFixture(
+    val what: String,
+    val lines: List<String>,
+    val expectedRefusal: String,
+)
+
+// Each fixture is one way the pipeline can stop keeping the promise. The
+// fragments are short on purpose: the rule names every violation it finds, so a
+// fragment reports the one under test among the ones its shortness causes.
+val ciPipelineFixtures = listOf(
+    CiPipelineFixture(
+        what = "a leg is missing",
+        lines = listOf("        os: [ubuntu-24.04, windows-2025]"),
+        expectedRefusal = "the pipeline's matrix carries no macos-26; " +
+            "the three legs are ubuntu-24.04, macos-26, windows-2025, pinned to exact labels",
+    ),
+    CiPipelineFixture(
+        what = "a floating runner label",
+        lines = listOf("    runs-on: ubuntu-latest"),
+        expectedRefusal = "the pipeline runs on ubuntu-latest; a -latest label moves the OS baseline, and the JavaFX classifier with it",
+    ),
+)
+
+/** Runs the pipeline fixtures and reports the ones whose rule did not answer as the fixture says. */
+class CiWorkflowFixtures(
+    private val ciPipelineFixtures: List<CiPipelineFixture>,
+) : FixtureChecks() {
+
+    fun count(): Int = ciPipelineFixtures.size
+
+    fun problems(): List<String> {
+        val problems = mutableListOf<String>()
+        ciPipelineFixtures.forEach { fixture ->
+            val refusal = refusalOf(CiPipelineRule(path = CiPipelineRule.PATH, lines = fixture.lines))
+            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
+        }
+        return problems
+    }
+}
+
+tasks.register("verifyCiWorkflowFixtures") {
+    group = "verification"
+    description = "Proves the pipeline rule refuses a dropped leg and a floating runner label with a message that names them."
+    // Plain data, so the action needs no reference to the build script itself.
+    val fixtures = CiWorkflowFixtures(ciPipelineFixtures)
+    doLast {
+        val problems = fixtures.problems()
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "The workflow fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
+            )
+        }
+        println("${fixtures.count()} workflow fixtures held")
+    }
+}
+
+tasks.named("check") { dependsOn("verifyCiWorkflowFixtures") }
