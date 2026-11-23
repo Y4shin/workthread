@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Build and package on three platforms in CI
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - dependency-checks
 - version-and-api-snapshot
