@@ -3,7 +3,7 @@ type: ticket
 subtype: feature
 title: Ship the empty window as a jlink image
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by:
 - named-modules
 size: m
