@@ -84,17 +84,22 @@ No third-party rule plugin.
 
 ## Packaging
 
-The `org.beryx.jlink` plugin builds the runtime image from the client module with `--strip-debug --compress zip-6` and a launcher named `workthread`. The prototype that proved this line produced the configuration below: no `mergedModule` block and no module-path inference setting were needed, and the `javafx` block is what puts JavaFX on the module path.
+The `org.beryx.jlink` plugin builds the runtime image from the client module with `--strip-debug --compress zip-6` and a launcher named `workthread`. The `application` plugin is required as well: `jlink` cannot link or start the module without `mainModule` and `mainClass`. Both plugin versions come from the version catalogue, and the JavaFX block is what puts JavaFX on the module path. No `mergedModule` block and no module-path inference setting are needed.
 
 ```kotlin
 plugins {
     application
-    id("org.openjfx.javafxplugin") version "0.1.0"
-    id("org.beryx.jlink") version "4.2.0"
+    alias(libs.plugins.javafx)
+    alias(libs.plugins.jlink)
+}
+
+application {
+    mainModule = "io.github.y4shin.workthread.client"
+    mainClass = "io.github.y4shin.workthread.client.WorkthreadApplication"
 }
 
 javafx {
-    version = "21.0.13"
+    version = libs.versions.javafx.get()
     modules = listOf("javafx.controls")
 }
 
@@ -104,9 +109,15 @@ jlink {
 }
 ```
 
-The client's descriptor must export the package holding its `Application` subclass, or JavaFX cannot construct it. The resulting image is about 67.6 MB on Linux x86_64. It includes `jdk.jfr`, because `jdeps` follows JavaFX's JFR logging classes. It still needs the host's GTK3 and X11 libraries at run time. The generated launcher points at a module directory that does not exist inside the image; the application module is in the linked runtime and the launcher works regardless. That quirk is cosmetic and accepted.
+The client's descriptor requires `javafx.controls`, which reads `javafx.graphics` transitively, and exports the package holding its `Application` subclass, or JavaFX cannot construct it. The application class carries `main`, so the image launcher, the generated start scripts, and `:client:run` share one entry point.
 
-The empty window carries the title `workthread`, is 1024x768, and shows one centred label reading `workthread 0.1.0`. It is the packaging proof, not a feature, and it holds no state.
+The image is `client/build/image` and the launcher is `client/build/image/bin/workthread`. On Linux x86_64 it is 67 611 290 bytes (64.5 MiB). It carries `java.base`, `java.desktop`, `java.xml`, `java.prefs`, `java.datatransfer`, `jdk.unsupported`, `jdk.jfr`, and `javafx.base`, `javafx.controls`, `javafx.graphics` 21.0.13, plus `client`, `contract`, and `wiring`. It includes `jdk.jfr` because `jdeps` follows JavaFX's JFR logging classes. The JDK module set is inferred by the plugin, not declared by a descriptor, so the descriptor-as-single-source rule covers the project and JavaFX modules only.
+
+At run time the image needs the host's GTK3 and X11 libraries, `libGL` and `libXxf86vm.so.1` for the ES2 pipeline, and a writable `~/.openjfx/cache` where the first launch extracts the JavaFX natives. The generated launcher points at a module directory that does not exist inside the image; the application module is in the linked runtime and the launcher works regardless. That quirk is cosmetic and accepted.
+
+Because `client` applies `application`, `:client:assemble` also emits `distTar` and `distZip`. Nothing consumes those distributions; the image is the shipping artifact. Whether they stay is open.
+
+The empty window carries the title `workthread`, is 1024x768, and shows one centred label reading `workthread 0.1.0`. The label text is a literal today, and the single version source does not feed it yet. It is the packaging proof, not a feature, and it holds no state.
 
 ## CI
 
