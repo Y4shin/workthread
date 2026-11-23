@@ -47,7 +47,11 @@ with the API between daemon and client. Logic that belongs to the work goes in
 the core, not in the API or the client, or standalone mode will need a fork of
 it.
 
-The modules are not scaffolded yet.
+The build has eight modules: `contract`, `core`, `adapters`, `wiring`, `cli`,
+`mcp`, `api`, and `client`. The edge table saying what each may depend on is
+declared once in `settings.gradle.kts`, and the build refuses a dependency or a
+module descriptor that leaves it. A new module requires an architecture change
+first.
 
 ## Writing
 

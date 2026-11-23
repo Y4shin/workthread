@@ -3,7 +3,6 @@
 // architecture's edge table is readable in one place per module.
 
 import java.io.File
-import java.lang.module.ModuleDescriptor
 import java.lang.reflect.Modifier
 import java.lang.reflect.Type
 import java.net.URLClassLoader
@@ -49,20 +48,14 @@ val pinnedJarArtifactNames = listOf(
     "assertj-core",
 )
 
-// The architecture's "May depend on" table, one row per module. This is the
-// build's copy of the table, and the dependency check's only source for what a
-// module may reach: a module with no row is not part of the architecture, so it
-// cannot be checked at all.
-val moduleEdgeRows: Map<String, List<String>> = mapOf(
-    "contract" to listOf(),
-    "core" to listOf("contract"),
-    "adapters" to listOf("contract"),
-    "wiring" to listOf("contract"),
-    "cli" to listOf("contract", "wiring"),
-    "mcp" to listOf("contract", "wiring"),
-    "api" to listOf("contract", "wiring"),
-    "client" to listOf("contract", "wiring"),
-)
+// The architecture's "May depend on" table, one row per module. `settings.gradle.kts`
+// declares it, because settings is where the project set is decided: it includes
+// one project per row and publishes the map here, so a module's name is spelled
+// once and a module cannot be included without a row. This is the dependency and
+// descriptor checks' only source for what a module may reach.
+@Suppress("UNCHECKED_CAST")
+val moduleEdgeRows: Map<String, List<String>> =
+    gradle.extensions.extraProperties.get("moduleEdgeRows") as Map<String, List<String>>
 
 // The package root, one subpackage per module. A module's name is its package:
 // `contract` is the module `io.github.y4shin.workthread.contract` and exports
@@ -78,9 +71,17 @@ fun qualifiedNameOf(module: String): String = "$packageRoot.$module"
 val modulesOnTheClasspath: Set<String> = setOf("api")
 
 // The client's descriptor must export the package that holds its `Application`
-// subclass, or JavaFX cannot construct it from the image. A placeholder type
-// stands in for that subclass until the client-image ticket replaces it.
+// subclass, or JavaFX cannot construct it from the image. The client is the one
+// module whose stand-in type carries no `Placeholder` name: the other seven hold
+// an `XPlaceholder` because a descriptor cannot export an empty package and no
+// real type exists yet, while this class is the client's own entry point, the one
+// the image launcher runs, and the image work replaces it in place.
 val clientApplicationClass = "$packageRoot.client.WorkthreadApplication"
+
+// The package root with its trailing dot: every module of this build is named
+// under it, which is how the descriptor rule tells an edge from a JDK or
+// declared-stack module.
+val moduleNamePrefix = "$packageRoot."
 
 // The declared stack puts JavaFX in the client alone. The runtime only warns
 // when JavaFX sits on the classpath, so the build refuses a JavaFX artifact
@@ -198,7 +199,7 @@ subprojects {
         expectedModuleName.set(if (project.name in modulesOnTheClasspath) "" else qualifiedNameOf(project.name))
         expectedPackage.set(qualifiedNameOf(project.name))
         allowedModuleNames.set(edgeRow.map { dependency -> qualifiedNameOf(dependency) })
-        moduleNamespace.set("$packageRoot.")
+        moduleNamespace.set(moduleNamePrefix)
         applicationClass.set(clientApplicationClass.takeIf { project.name == "client" }.orEmpty())
         descriptorJar.set(tasks.named<Jar>("jar").flatMap { jar -> jar.archiveFile })
     }
@@ -278,15 +279,19 @@ tasks.register("printPinnedModuleNames") {
 }
 
 // ---------------------------------------------------------------------------
-// The dependency rules
+// The rules the root build runs
 // ---------------------------------------------------------------------------
 
 /**
- * A rule that names every violation it finds, then refuses the build. The
- * message is part of the behaviour: it says which module, and what it declared,
- * so a reader can fix the build without opening the rule.
+ * One root-build rule: it names every violation it finds, then refuses the build.
+ * The message is part of the behaviour: it says which module, and what it
+ * declared, so a reader can fix the build without opening the rule.
+ *
+ * Every family of checks stands on this base, because a check that a version rule
+ * reports is not a dependency check: what the families share is the refusal, not
+ * the subject.
  */
-abstract class DependencyRule {
+abstract class BuildRule {
 
     abstract fun violations(): List<String>
 
@@ -296,6 +301,10 @@ abstract class DependencyRule {
             throw GradleException(violations.joinToString(separator = "\n"))
         }
     }
+
+    /** The allowed set, worded for a refusal: "nothing" reads better than an empty list. */
+    protected fun row(allowed: List<String>): String =
+        if (allowed.isEmpty()) "nothing" else allowed.joinToString(separator = ", ")
 }
 
 /**
@@ -307,14 +316,14 @@ class ModuleDependencyRule(
     private val allowedEdges: List<String>,
     private val moduleDependencies: List<String>,
     private val libraries: List<String>,
-) : DependencyRule() {
+) : BuildRule() {
 
     override fun violations(): List<String> {
         val violations = mutableListOf<String>()
         moduleDependencies
             .filterNot { dependency -> dependency in allowedEdges }
             .forEach { dependency ->
-                violations.add("$module declares a dependency on $dependency, which its edge row does not allow; the row allows ${row()}")
+                violations.add("$module declares a dependency on $dependency, which its edge row does not allow; the row allows ${row(allowedEdges)}")
             }
         if (module == CORE) {
             libraries.forEach { library ->
@@ -324,8 +333,6 @@ class ModuleDependencyRule(
         }
         return violations
     }
-
-    private fun row(): String = if (allowedEdges.isEmpty()) "nothing" else allowedEdges.joinToString(separator = ", ")
 
     // The core's rule is about families, not single artifacts: Spring Boot's
     // artifacts sit under org.springframework.boot and the framework's under
@@ -386,7 +393,7 @@ class RuntimeClasspathRule(
     private val configuration: String,
     private val artifacts: List<String>,
     private val mayCarryJavaFx: Boolean,
-) : DependencyRule() {
+) : BuildRule() {
 
     override fun violations(): List<String> {
         if (mayCarryJavaFx) {
@@ -441,6 +448,50 @@ abstract class VerifyNoJavaFxOnRuntimeClasspath : DefaultTask() {
 // ---------------------------------------------------------------------------
 
 /**
+ * What a module descriptor says, as the descriptor rule reads it: the module name
+ * the descriptor declares (null when there is no explicit descriptor at all), the
+ * modules it requires, and the packages it exports. Reading the shape from a
+ * built jar and declaring one in a fixture produce the same value, so the rule
+ * can be held to a case without a jar being written for it.
+ */
+class DescriptorShape(
+    val moduleName: String?,
+    val requires: List<String>,
+    val exports: List<String>,
+) {
+
+    companion object {
+
+        /**
+         * The explicit descriptor a jar carries, or the empty shape when it carries
+         * none. An automatic module is derived from a jar's name, not declared, so it
+         * does not count as a descriptor a reader can read the exports from.
+         */
+        fun ofJar(jar: File): DescriptorShape {
+            val descriptor = ModuleFinder.of(jar.toPath()).findAll().singleOrNull()?.descriptor()
+                ?.takeUnless { found -> found.isAutomatic }
+                ?: return DescriptorShape(moduleName = null, requires = listOf(), exports = listOf())
+            return DescriptorShape(
+                moduleName = descriptor.name(),
+                requires = descriptor.requires().map { required -> required.name() },
+                exports = descriptor.exports().map { exported -> exported.source() },
+            )
+        }
+
+        /** The types a jar holds, so a check can ask whether one of them is in it. */
+        fun typesIn(jar: File): List<String> =
+            ZipFile(jar).use { archive ->
+                archive.entries().asSequence()
+                    .map { entry -> entry.name }
+                    .filter { name -> name.endsWith(".class") }
+                    .filter { name -> name != "module-info.class" }
+                    .map { name -> name.removeSuffix(".class").replace('/', '.') }
+                    .toList()
+            }
+    }
+}
+
+/**
  * The descriptor rule: a named module's jar carries a descriptor, a classpath
  * module's jar carries none, and the descriptor agrees with the module's edge
  * row. Every violation names the module, so a reader can fix the build without
@@ -453,69 +504,56 @@ class ModuleDescriptorRule(
     private val allowedModuleNames: List<String>,
     private val moduleNamespace: String,
     private val applicationClass: String?,
-    private val jar: File,
-) : DependencyRule() {
+    private val descriptor: DescriptorShape,
+    private val types: List<String>,
+) : BuildRule() {
 
     override fun violations(): List<String> {
-        val descriptor = explicitDescriptor()
+        val declaredName = descriptor.moduleName
         if (expectedModuleName == null) {
-            return if (descriptor == null) {
+            return if (declaredName == null) {
                 listOf()
             } else {
-                listOf("$module runs on the classpath and its jar carries the module descriptor ${descriptor.name()}; only the seven named modules carry one")
+                listOf("$module runs on the classpath and its jar carries the module descriptor $declaredName; only the seven named modules carry one")
             }
         }
-        if (descriptor == null) {
+        if (declaredName == null) {
             return listOf("$module's jar carries no module descriptor; $expectedModuleName is a named module")
         }
         val violations = mutableListOf<String>()
-        if (descriptor.name() != expectedModuleName) {
-            violations.add("$module's jar reports the module name ${descriptor.name()}, and its descriptor must declare $expectedModuleName")
+        if (declaredName != expectedModuleName) {
+            violations.add("$module's jar reports the module name $declaredName, and its descriptor must declare $expectedModuleName")
         }
         val required = buildModulesRequiredBy(descriptor)
         required.filterNot { name -> name in allowedModuleNames }.forEach { name ->
-            violations.add("$module requires $name, which its edge row does not allow; the row allows ${row()}")
+            violations.add("$module requires $name, which its edge row does not allow; the row allows ${row(allowedModuleNames)}")
         }
         allowedModuleNames.filterNot { name -> name in required }.forEach { name ->
             violations.add("$module does not require $name, and its edge row names it")
         }
-        if (expectedPackage !in exportedPackages(descriptor)) {
+        if (expectedPackage !in descriptor.exports) {
             violations.add("$module does not export $expectedPackage; its descriptor must export the package its public types live in")
         }
         if (applicationClass != null) {
             val applicationPackage = applicationClass.substringBeforeLast('.')
-            if (!jarContains(applicationClass)) {
+            if (applicationClass !in types) {
                 violations.add("$module's jar holds no $applicationClass, and that class is the one its exported package must be able to hold")
             }
-            if (applicationPackage !in exportedPackages(descriptor)) {
+            if (applicationPackage !in descriptor.exports) {
                 violations.add("$module does not export $applicationPackage, which holds its application class; a class in a package a module keeps to itself cannot be constructed")
             }
         }
         return violations
     }
 
-    private fun jarContains(type: String): Boolean =
-        ZipFile(jar).use { archive -> archive.getEntry(type.replace('.', '/') + ".class") != null }
-
     // The edge table names modules of this build. A JDK module (`java.logging`)
     // and an external module from the declared stack (`javafx.controls`) are not
     // edges in that table, so the rule judges the build's own modules and leaves
     // the rest to the declared stack's checks.
-    private fun buildModulesRequiredBy(descriptor: ModuleDescriptor): List<String> =
-        descriptor.requires()
-            .map { requires -> requires.name() }
+    private fun buildModulesRequiredBy(descriptor: DescriptorShape): List<String> =
+        descriptor.requires
             .filter { name -> name.startsWith(moduleNamespace) }
             .sorted()
-
-    private fun exportedPackages(descriptor: ModuleDescriptor): List<String> =
-        descriptor.exports().map { exported -> exported.source() }
-
-    private fun row(): String = if (allowedModuleNames.isEmpty()) "nothing" else allowedModuleNames.joinToString(separator = ", ")
-
-    // An automatic module is derived from a jar's name, not declared, so it does
-    // not count as a descriptor a reader can read the exports from.
-    private fun explicitDescriptor() =
-        ModuleFinder.of(jar.toPath()).findAll().singleOrNull()?.descriptor()?.takeUnless { descriptor -> descriptor.isAutomatic }
 }
 
 /** One module's built jar, checked against the module it must declare. */
@@ -545,6 +583,7 @@ abstract class VerifyModuleDescriptor : DefaultTask() {
 
     @TaskAction
     fun verifyDescriptor() {
+        val jar = descriptorJar.get().asFile
         ModuleDescriptorRule(
             module = moduleName.get(),
             expectedModuleName = expectedModuleName.get().ifEmpty { null },
@@ -552,7 +591,8 @@ abstract class VerifyModuleDescriptor : DefaultTask() {
             allowedModuleNames = allowedModuleNames.get(),
             moduleNamespace = moduleNamespace.get(),
             applicationClass = applicationClass.get().ifEmpty { null },
-            jar = descriptorJar.get().asFile,
+            descriptor = DescriptorShape.ofJar(jar),
+            types = DescriptorShape.typesIn(jar),
         ).verify()
     }
 }
@@ -571,7 +611,7 @@ class VersionRule(
     private val source: String,
     private val reportedVersions: Map<String, String>,
     private val moduleSources: Map<String, String>,
-) : DependencyRule() {
+) : BuildRule() {
 
     override fun violations(): List<String> {
         val violations = mutableListOf<String>()
@@ -609,7 +649,7 @@ class ApiSurfaceRule(
     private val snapshotPath: String,
     private val baseline: List<String>?,
     private val current: List<String>,
-) : DependencyRule() {
+) : BuildRule() {
 
     override fun violations(): List<String> {
         if (baseline == null) {
@@ -917,9 +957,85 @@ tasks.register<GenerateContractApiSnapshot>("generateContractApiSnapshot") {
 }
 
 // ---------------------------------------------------------------------------
-// The fixtures: one declared violation per failure, and the refusal it must
-// produce. The fixture convention is a plain data list plus one task that runs
-// them, so a later check can add its own list and its own task.
+// The fixture convention: one plain data list per rule family, one family class
+// that turns its lists into cases, and one task per family that rides `check`.
+// The one registration loop at the end of the script registers every family, so
+// a later rule adds its data and its class and no plumbing.
+// ---------------------------------------------------------------------------
+
+/**
+ * One fixture: what it declares, the refusal it must produce, and the rule that
+ * has to answer it. `expectedRefusal` is null when the rule must accept the
+ * fixture, and the rule is built when the family runs, so a fixture holds data
+ * and not a verdict.
+ */
+class FixtureCase(
+    val what: String,
+    val expectedRefusal: String?,
+    val rule: BuildRule,
+)
+
+/**
+ * One rule family's fixtures, run as a task of its own on the root `check`. A
+ * family declares its task name, the subject its failure names, its task
+ * description, and its cases; the base owns the refusal, the count it prints,
+ * and the wording of a disagreement, so a new family adds data and nothing else.
+ */
+abstract class FixtureChecks(
+    val taskName: String,
+    val subject: String,
+    val description: String,
+) {
+
+    /** Every fixture the family declares, with the rule that has to answer it. */
+    abstract fun cases(): List<FixtureCase>
+
+    /** Every fixture's disagreement with its rule, worded so the failure names it. */
+    fun problems(): List<String> = cases().mapNotNull { fixture -> disagreementOf(fixture) }
+
+    /** Refuses the build with every disagreement the family's fixtures found. */
+    fun verify() {
+        val problems = problems()
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "The $subject fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
+            )
+        }
+        println("${cases().size} $subject fixtures held")
+    }
+
+    /**
+     * One fixture's disagreement with its rule, or null when the rule answered as
+     * the fixture says it must.
+     */
+    private fun disagreementOf(fixture: FixtureCase): String? {
+        val expected = fixture.expectedRefusal
+        val refusal = refusalOf(fixture.rule)
+        return when {
+            expected == null && refusal != null ->
+                "Fixture '${fixture.what}' was refused, and it must be accepted: $refusal"
+            expected != null && refusal == null ->
+                "Fixture '${fixture.what}' was accepted, and it must be refused with: $expected"
+            expected != null && refusal != null && !refusal.contains(expected) ->
+                "Fixture '${fixture.what}' was refused with '$refusal', and the refusal must carry: $expected"
+            else -> null
+        }
+    }
+
+    // A base class rather than a top-level function, because a script-level
+    // function pulls the build script into every object that calls it, and the
+    // configuration cache cannot serialize that.
+    private fun refusalOf(rule: BuildRule): String? =
+        try {
+            rule.verify()
+            null
+        } catch (refusal: GradleException) {
+            refusal.message
+        }
+}
+
+// ---------------------------------------------------------------------------
+// The dependency rules' fixtures
 // ---------------------------------------------------------------------------
 
 /**
@@ -1011,62 +1127,41 @@ val runtimeClasspathFixtures = listOf(
     ),
 )
 
-/** Runs every fixture and reports the ones whose rule did not answer as the fixture says. */
+/** The dependency rules' fixtures: the declared-dependency rule and the runtime classpath rule. */
 class DependencyRuleFixtures(
     private val moduleDependencyFixtures: List<ModuleDependencyFixture>,
     private val runtimeClasspathFixtures: List<RuntimeClasspathFixture>,
-) : FixtureChecks() {
+) : FixtureChecks(
+    taskName = "verifyDependencyRuleFixtures",
+    subject = "dependency rule",
+    description = "Proves each dependency rule refuses a declared violation with a message that names it.",
+) {
 
-    fun count(): Int = moduleDependencyFixtures.size + runtimeClasspathFixtures.size
-
-    fun problems(): List<String> {
-        val problems = mutableListOf<String>()
-        moduleDependencyFixtures.forEach { fixture ->
-            val refusal = refusalOf(
-                ModuleDependencyRule(
+    override fun cases(): List<FixtureCase> =
+        moduleDependencyFixtures.map { fixture ->
+            FixtureCase(
+                what = fixture.what,
+                expectedRefusal = fixture.expectedRefusal,
+                rule = ModuleDependencyRule(
                     module = fixture.module,
                     allowedEdges = fixture.allowedEdges,
                     moduleDependencies = fixture.moduleDependencies,
                     libraries = fixture.libraries,
                 ),
             )
-            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
-        }
-        runtimeClasspathFixtures.forEach { fixture ->
-            val refusal = refusalOf(
-                RuntimeClasspathRule(
+        } + runtimeClasspathFixtures.map { fixture ->
+            FixtureCase(
+                what = fixture.what,
+                expectedRefusal = fixture.expectedRefusal,
+                rule = RuntimeClasspathRule(
                     module = fixture.module,
                     configuration = fixture.configuration,
                     artifacts = fixture.artifacts,
                     mayCarryJavaFx = fixture.mayCarryJavaFx,
                 ),
             )
-            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
         }
-        return problems
-    }
-
 }
-
-tasks.register("verifyDependencyRuleFixtures") {
-    group = "verification"
-    description = "Proves each dependency rule refuses a declared violation with a message that names it."
-    // Plain data, so the action needs no reference to the build script itself.
-    val fixtures = DependencyRuleFixtures(moduleDependencyFixtures, runtimeClasspathFixtures)
-    doLast {
-        val problems = fixtures.problems()
-        if (problems.isNotEmpty()) {
-            throw GradleException(
-                "The dependency rule fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
-            )
-        }
-        println("${fixtures.count()} dependency rule fixtures held")
-    }
-}
-
-// The fixtures are part of the suite: `check` runs them, so a rule that stops
-// refusing a declared violation breaks the build rather than going quiet.
-tasks.named("check") { dependsOn("verifyDependencyRuleFixtures") }
 
 // ---------------------------------------------------------------------------
 // The version and surface fixtures
@@ -1233,91 +1328,222 @@ val apiSurfaceFixtures = listOf(
     ),
 )
 
-/**
- * Runs the version and surface fixtures, and reports the ones whose rule did not
- * answer as the fixture says. One runner for this ticket's fixtures: each list
- * is plain data, so a later ticket adds its own list and its own runner.
- */
+/** The version rule's fixtures and the contract surface rule's fixtures. */
 class VersionAndSurfaceFixtures(
     private val versionFixtures: List<VersionFixture>,
     private val apiSurfaceFixtures: List<ApiSurfaceFixture>,
-) : FixtureChecks() {
+) : FixtureChecks(
+    taskName = "verifyVersionAndSurfaceFixtures",
+    subject = "version and surface",
+    description = "Proves the version rule refuses a module that reports another version or a source that restates it, and the surface rule refuses a removed or reshaped export.",
+) {
 
-    fun count(): Int = versionFixtures.size + apiSurfaceFixtures.size
-
-    fun problems(): List<String> {
-        val problems = mutableListOf<String>()
-        versionFixtures.forEach { fixture ->
-            val refusal = refusalOf(
-                VersionRule(
+    override fun cases(): List<FixtureCase> =
+        versionFixtures.map { fixture ->
+            FixtureCase(
+                what = fixture.what,
+                expectedRefusal = fixture.expectedRefusal,
+                rule = VersionRule(
                     source = fixture.source,
                     reportedVersions = fixture.reportedVersions,
                     moduleSources = fixture.moduleSources,
                 ),
             )
-            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
-        }
-        apiSurfaceFixtures.forEach { fixture ->
-            val refusal = refusalOf(
-                ApiSurfaceRule(
+        } + apiSurfaceFixtures.map { fixture ->
+            FixtureCase(
+                what = fixture.what,
+                expectedRefusal = fixture.expectedRefusal,
+                rule = ApiSurfaceRule(
                     module = "contract",
                     snapshotPath = "contract/api-snapshot.txt",
                     baseline = fixture.snapshot,
                     current = fixture.surface,
                 ),
             )
-            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
         }
-        return problems
-    }
 }
+
+// ---------------------------------------------------------------------------
+// The module descriptor fixtures
+// ---------------------------------------------------------------------------
 
 /**
- * One fixture's disagreement with its rule. A base class rather than a top-level
- * function, because a script-level function pulls the build script into every
- * object that calls it, and the configuration cache cannot serialize that.
+ * A descriptor and the refusal it must produce: where the module sits in the
+ * edge table, the shape its descriptor declares, the types its jar holds, and
+ * null when the rule must accept all of it. A fixture declares the shape rather
+ * than a jar, so the rule is held to a case without a jar being written for it.
  */
-abstract class FixtureChecks {
+class ModuleDescriptorFixture(
+    val what: String,
+    val module: String,
+    val expectedModuleName: String?,
+    val expectedPackage: String,
+    val allowedModuleNames: List<String>,
+    val descriptor: DescriptorShape,
+    val types: List<String>,
+    val applicationClass: String? = null,
+    val expectedRefusal: String?,
+)
 
-    /** The refusal a rule produces, or null when it accepts what it was given. */
-    protected fun refusalOf(rule: DependencyRule): String? =
-        try {
-            rule.verify()
-            null
-        } catch (refusal: GradleException) {
-            refusal.message
-        }
+// Each fixture is one shape a descriptor can take. The refusals are written from
+// the architecture's descriptor paragraph, not from the rule's code, and the two
+// accepted cases guard the other half: a descriptor that agrees with its row, and
+// the classpath module that carries none, have to stay allowed.
+//
+// An automatic descriptor has no fixture of its own: `DescriptorShape.ofJar`
+// collapses one to "no explicit descriptor", which is the missing case below.
+val moduleDescriptorFixtures = listOf(
+    ModuleDescriptorFixture(
+        what = "a named module's jar carries no descriptor",
+        module = "contract",
+        expectedModuleName = "io.github.y4shin.workthread.contract",
+        expectedPackage = "io.github.y4shin.workthread.contract",
+        allowedModuleNames = listOf(),
+        descriptor = DescriptorShape(moduleName = null, requires = listOf(), exports = listOf()),
+        types = listOf("io.github.y4shin.workthread.contract.ContractPlaceholder"),
+        expectedRefusal = "contract's jar carries no module descriptor; io.github.y4shin.workthread.contract is a named module",
+    ),
+    ModuleDescriptorFixture(
+        what = "a descriptor names another module",
+        module = "contract",
+        expectedModuleName = "io.github.y4shin.workthread.contract",
+        expectedPackage = "io.github.y4shin.workthread.contract",
+        allowedModuleNames = listOf(),
+        descriptor = DescriptorShape(
+            moduleName = "io.github.y4shin.workthread.core",
+            requires = listOf(),
+            exports = listOf("io.github.y4shin.workthread.contract"),
+        ),
+        types = listOf("io.github.y4shin.workthread.contract.ContractPlaceholder"),
+        expectedRefusal = "contract's jar reports the module name io.github.y4shin.workthread.core, " +
+            "and its descriptor must declare io.github.y4shin.workthread.contract",
+    ),
+    ModuleDescriptorFixture(
+        what = "a descriptor requires a module the edge row does not allow",
+        module = "core",
+        expectedModuleName = "io.github.y4shin.workthread.core",
+        expectedPackage = "io.github.y4shin.workthread.core",
+        allowedModuleNames = listOf("io.github.y4shin.workthread.contract"),
+        descriptor = DescriptorShape(
+            moduleName = "io.github.y4shin.workthread.core",
+            requires = listOf("io.github.y4shin.workthread.cli", "io.github.y4shin.workthread.contract"),
+            exports = listOf("io.github.y4shin.workthread.core"),
+        ),
+        types = listOf("io.github.y4shin.workthread.core.CorePlaceholder"),
+        expectedRefusal = "core requires io.github.y4shin.workthread.cli, which its edge row does not allow; " +
+            "the row allows io.github.y4shin.workthread.contract",
+    ),
+    ModuleDescriptorFixture(
+        what = "a descriptor omits an edge the row names",
+        module = "client",
+        expectedModuleName = "io.github.y4shin.workthread.client",
+        expectedPackage = "io.github.y4shin.workthread.client",
+        allowedModuleNames = listOf("io.github.y4shin.workthread.contract", "io.github.y4shin.workthread.wiring"),
+        descriptor = DescriptorShape(
+            moduleName = "io.github.y4shin.workthread.client",
+            requires = listOf("io.github.y4shin.workthread.contract"),
+            exports = listOf("io.github.y4shin.workthread.client"),
+        ),
+        types = listOf("io.github.y4shin.workthread.client.WorkthreadApplication"),
+        applicationClass = "io.github.y4shin.workthread.client.WorkthreadApplication",
+        expectedRefusal = "client does not require io.github.y4shin.workthread.wiring, and its edge row names it",
+    ),
+    ModuleDescriptorFixture(
+        what = "a descriptor exports no package",
+        module = "contract",
+        expectedModuleName = "io.github.y4shin.workthread.contract",
+        expectedPackage = "io.github.y4shin.workthread.contract",
+        allowedModuleNames = listOf(),
+        descriptor = DescriptorShape(moduleName = "io.github.y4shin.workthread.contract", requires = listOf(), exports = listOf()),
+        types = listOf("io.github.y4shin.workthread.contract.ContractPlaceholder"),
+        expectedRefusal = "contract does not export io.github.y4shin.workthread.contract; " +
+            "its descriptor must export the package its public types live in",
+    ),
+    ModuleDescriptorFixture(
+        what = "the client's jar holds no application class",
+        module = "client",
+        expectedModuleName = "io.github.y4shin.workthread.client",
+        expectedPackage = "io.github.y4shin.workthread.client",
+        allowedModuleNames = listOf("io.github.y4shin.workthread.contract", "io.github.y4shin.workthread.wiring"),
+        descriptor = DescriptorShape(
+            moduleName = "io.github.y4shin.workthread.client",
+            requires = listOf("io.github.y4shin.workthread.contract", "io.github.y4shin.workthread.wiring"),
+            exports = listOf("io.github.y4shin.workthread.client"),
+        ),
+        types = listOf(),
+        applicationClass = "io.github.y4shin.workthread.client.WorkthreadApplication",
+        expectedRefusal = "client's jar holds no io.github.y4shin.workthread.client.WorkthreadApplication, " +
+            "and that class is the one its exported package must be able to hold",
+    ),
+    ModuleDescriptorFixture(
+        what = "the classpath module's jar carries a descriptor",
+        module = "api",
+        expectedModuleName = null,
+        expectedPackage = "io.github.y4shin.workthread.api",
+        allowedModuleNames = listOf(),
+        descriptor = DescriptorShape(
+            moduleName = "io.github.y4shin.workthread.api",
+            requires = listOf(),
+            exports = listOf("io.github.y4shin.workthread.api"),
+        ),
+        types = listOf(),
+        expectedRefusal = "api runs on the classpath and its jar carries the module descriptor " +
+            "io.github.y4shin.workthread.api; only the seven named modules carry one",
+    ),
+    ModuleDescriptorFixture(
+        what = "a descriptor agrees with its edge row",
+        module = "contract",
+        expectedModuleName = "io.github.y4shin.workthread.contract",
+        expectedPackage = "io.github.y4shin.workthread.contract",
+        allowedModuleNames = listOf(),
+        descriptor = DescriptorShape(
+            moduleName = "io.github.y4shin.workthread.contract",
+            requires = listOf(),
+            exports = listOf("io.github.y4shin.workthread.contract"),
+        ),
+        types = listOf("io.github.y4shin.workthread.contract.ContractPlaceholder"),
+        expectedRefusal = null,
+    ),
+    ModuleDescriptorFixture(
+        what = "the classpath module's jar carries no descriptor",
+        module = "api",
+        expectedModuleName = null,
+        expectedPackage = "io.github.y4shin.workthread.api",
+        allowedModuleNames = listOf(),
+        descriptor = DescriptorShape(moduleName = null, requires = listOf(), exports = listOf()),
+        types = listOf(),
+        expectedRefusal = null,
+    ),
+)
 
-    /** Adds the problem, worded so the failure names the fixture and what was expected. */
-    protected fun fixtureProblem(problems: MutableList<String>, what: String, expected: String?, refusal: String?) {
-        when {
-            expected == null && refusal != null ->
-                problems.add("Fixture '$what' was refused, and it must be accepted: $refusal")
-            expected != null && refusal == null ->
-                problems.add("Fixture '$what' was accepted, and it must be refused with: $expected")
-            expected != null && refusal != null && !refusal.contains(expected) ->
-                problems.add("Fixture '$what' was refused with '$refusal', and the refusal must carry: $expected")
-        }
-    }
-}
+/** The descriptor rule's fixtures, over the shapes a module's descriptor can take. */
+class ModuleDescriptorFixtures(
+    private val moduleDescriptorFixtures: List<ModuleDescriptorFixture>,
+    private val moduleNamespace: String,
+) : FixtureChecks(
+    taskName = "verifyModuleDescriptorRuleFixtures",
+    subject = "module descriptor",
+    description = "Proves the descriptor rule refuses a missing or misnamed descriptor, an edge or an export it does not declare, and a descriptor on a classpath module.",
+) {
 
-tasks.register("verifyVersionAndSurfaceFixtures") {
-    group = "verification"
-    description = "Proves the version rule refuses a module that reports another version or a source that restates it, and the surface rule refuses a removed or reshaped export."
-    // Plain data, built here so the action holds no reference to the build script.
-    val fixtures = VersionAndSurfaceFixtures(versionFixtures, apiSurfaceFixtures)
-    doLast {
-        val problems = fixtures.problems()
-        if (problems.isNotEmpty()) {
-            throw GradleException(
-                "The version and surface fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
+    override fun cases(): List<FixtureCase> =
+        moduleDescriptorFixtures.map { fixture ->
+            FixtureCase(
+                what = fixture.what,
+                expectedRefusal = fixture.expectedRefusal,
+                rule = ModuleDescriptorRule(
+                    module = fixture.module,
+                    expectedModuleName = fixture.expectedModuleName,
+                    expectedPackage = fixture.expectedPackage,
+                    allowedModuleNames = fixture.allowedModuleNames,
+                    moduleNamespace = moduleNamespace,
+                    applicationClass = fixture.applicationClass,
+                    descriptor = fixture.descriptor,
+                    types = fixture.types,
+                ),
             )
         }
-        println("${fixtures.count()} version and surface fixtures held")
-    }
 }
-
-tasks.named("check") { dependsOn("verifyVersionAndSurfaceFixtures") }
 
 // ---------------------------------------------------------------------------
 // The pipeline: `.github/workflows/ci.yml` is the pipeline, so the check reads
@@ -1338,7 +1564,7 @@ tasks.named("check") { dependsOn("verifyVersionAndSurfaceFixtures") }
 class CiPipelineRule(
     private val path: String,
     private val lines: List<String>?,
-) : DependencyRule() {
+) : BuildRule() {
 
     override fun violations(): List<String> {
         if (lines == null) {
@@ -1498,7 +1724,7 @@ class CiPipelineRule(
  * A comment is not a step, so the workflow can say why it needs none of them
  * without this rule reading that sentence as a step.
  */
-class ForbiddenCiStepRule(private val lines: List<String>?) : DependencyRule() {
+class ForbiddenCiStepRule(private val lines: List<String>?) : BuildRule() {
 
     override fun violations(): List<String> {
         // A missing workflow is the pipeline rule's refusal, and there is nothing
@@ -1747,42 +1973,49 @@ val forbiddenCiStepFixtures = listOf(
     ),
 )
 
-/** Runs the pipeline fixtures and reports the ones whose rule did not answer as the fixture says. */
+/** The pipeline rule's fixtures and the forbidden-step rule's fixtures. */
 class CiWorkflowFixtures(
     private val ciPipelineFixtures: List<CiPipelineFixture>,
     private val forbiddenCiStepFixtures: List<ForbiddenCiStepFixture>,
-) : FixtureChecks() {
+) : FixtureChecks(
+    taskName = "verifyCiWorkflowFixtures",
+    subject = "workflow",
+    description = "Proves the pipeline rules refuse a dropped leg, a floating label, an unpinned JDK, a missing image upload, or a display step, with messages that name them.",
+) {
 
-    fun count(): Int = ciPipelineFixtures.size + forbiddenCiStepFixtures.size
-
-    fun problems(): List<String> {
-        val problems = mutableListOf<String>()
-        ciPipelineFixtures.forEach { fixture ->
-            val refusal = refusalOf(CiPipelineRule(path = CiPipelineRule.PATH, lines = fixture.lines))
-            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
-        }
-        forbiddenCiStepFixtures.forEach { fixture ->
-            val refusal = refusalOf(ForbiddenCiStepRule(lines = fixture.lines))
-            fixtureProblem(problems, fixture.what, fixture.expectedRefusal, refusal)
-        }
-        return problems
-    }
-}
-
-tasks.register("verifyCiWorkflowFixtures") {
-    group = "verification"
-    description = "Proves the pipeline rules refuse a dropped leg, a floating label, an unpinned JDK, a missing image upload, or a display step, with messages that name them."
-    // Plain data, so the action needs no reference to the build script itself.
-    val fixtures = CiWorkflowFixtures(ciPipelineFixtures, forbiddenCiStepFixtures)
-    doLast {
-        val problems = fixtures.problems()
-        if (problems.isNotEmpty()) {
-            throw GradleException(
-                "The workflow fixtures did not hold:\n" + problems.joinToString(separator = "\n") { problem -> "  $problem" },
+    override fun cases(): List<FixtureCase> =
+        ciPipelineFixtures.map { fixture ->
+            FixtureCase(
+                what = fixture.what,
+                expectedRefusal = fixture.expectedRefusal,
+                rule = CiPipelineRule(path = CiPipelineRule.PATH, lines = fixture.lines),
+            )
+        } + forbiddenCiStepFixtures.map { fixture ->
+            FixtureCase(
+                what = fixture.what,
+                expectedRefusal = fixture.expectedRefusal,
+                rule = ForbiddenCiStepRule(lines = fixture.lines),
             )
         }
-        println("${fixtures.count()} workflow fixtures held")
-    }
 }
 
-tasks.named("check") { dependsOn("verifyCiWorkflowFixtures") }
+// One task per rule family, each attached to the root `check`, so a rule that
+// stops refusing a declared violation breaks the build rather than going quiet.
+// The families are built here, where their data lists are in scope, and the
+// action holds the family and nothing else, which is what the configuration
+// cache serializes.
+val fixtureFamilies: List<FixtureChecks> = listOf(
+    DependencyRuleFixtures(moduleDependencyFixtures, runtimeClasspathFixtures),
+    VersionAndSurfaceFixtures(versionFixtures, apiSurfaceFixtures),
+    ModuleDescriptorFixtures(moduleDescriptorFixtures, moduleNamePrefix),
+    CiWorkflowFixtures(ciPipelineFixtures, forbiddenCiStepFixtures),
+)
+
+fixtureFamilies.forEach { family ->
+    tasks.register(family.taskName) {
+        group = "verification"
+        description = family.description
+        doLast { family.verify() }
+    }
+    tasks.named("check") { dependsOn(family.taskName) }
+}

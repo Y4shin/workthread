@@ -36,6 +36,13 @@ dependencies {
     implementation(project(":wiring"))
 }
 
+// The image is the shipping artifact. `application` also assembles a tar and a
+// zip of the jars and start scripts, and nothing consumes them: the image is what
+// ships, so a second packaging route would only drift from it. Both are
+// disabled, and `client/build` holds one packaging output.
+tasks.named("distTar") { enabled = false }
+tasks.named("distZip") { enabled = false }
+
 // The version reaches the window the same way it reaches every jar: Gradle
 // writes it from the one property in `gradle.properties`. The client reads a
 // generated resource, so no source file restates the number and the label

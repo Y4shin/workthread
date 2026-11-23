@@ -16,6 +16,12 @@ import javafx.stage.Stage;
  * The label takes its number from {@link WorkthreadVersion}, which reads the
  * resource Gradle generates from {@code gradle.properties}; this class holds no
  * copy of the version.
+ *
+ * <p>The other seven modules carry an {@code XPlaceholder} type, and this class
+ * is deliberately not called {@code ClientPlaceholder}. A placeholder stands in
+ * for the first real type of a module that has none yet; this class <em>is</em>
+ * the client's entry point, the one the image launcher runs, and the image work
+ * replaces it in place instead of deleting a stand-in.
  */
 public final class WorkthreadApplication extends Application {
 
