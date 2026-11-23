@@ -158,6 +158,9 @@ subprojects {
     // in. A plugin that adds coordinates later (the JavaFX plugin does) is the
     // runtime classpath check's business: what a module *declares* is what a
     // reader finds in its build file.
+    //
+    // Both source sets are read here, so a forbidden edge cannot pass by being
+    // declared as `testImplementation` instead of `implementation`.
     afterEvaluate {
         val module = name
         val sourceSets = extensions.getByType<SourceSetContainer>()
@@ -174,12 +177,13 @@ subprojects {
 
         tasks.register<VerifyModuleDependencies>("verifyModuleDependencies") {
             group = "verification"
-            description = "Refuses a declared dependency the module's edge row does not allow, and Spring or JavaFX in the core."
+            description = "Refuses a declared dependency the module's edge row does not allow, in either source set, and Spring or JavaFX in the core."
             moduleName.set(module)
             allowedEdges.set(edgeRow)
             moduleDependencies.set(edges)
             libraries.set(libraryCoordinates)
             testModuleDependencies.set(testEdges)
+            testLibraries.set(testLibraryCoordinates)
         }
         tasks.named("check") { dependsOn("verifyModuleDependencies") }
     }
@@ -335,6 +339,9 @@ abstract class BuildRule {
 /**
  * The declared-dependency rule: a module reaches only the modules its edge row
  * names, and the core carries no framework, or standalone mode needs Spring too.
+ * The module's tests reach nothing the module's own code may not reach, so the
+ * test source set is judged by the same rule: a forbidden edge is a forbidden
+ * edge whether the main code declares it or a test does.
  */
 class ModuleDependencyRule(
     private val module: String,
@@ -342,10 +349,11 @@ class ModuleDependencyRule(
     private val moduleDependencies: List<String>,
     private val libraries: List<String>,
     private val testModuleDependencies: List<String>,
+    private val testLibraries: List<String>,
 ) : BuildRule() {
 
     override fun violations(): List<String> =
-        refusalsFor(moduleDependencies, libraries) + refusalsFor(testModuleDependencies, listOf())
+        refusalsFor(moduleDependencies, libraries) + refusalsFor(testModuleDependencies, testLibraries)
 
     /**
      * The refusals one scope's declarations earn: a project dependency outside
@@ -393,8 +401,10 @@ class ModuleDependencyRule(
 /**
  * One module's declared dependencies, checked against its edge row. The task
  * reads the declarations the module's own build file made, across both
- * classpath hierarchies, because a module may declare an edge as `api` or as
- * `implementation` and the edge table names the edge, not the configuration.
+ * classpath hierarchies of both source sets, because a module may declare an
+ * edge as `api` or as `implementation`, a test may declare one as
+ * `testImplementation` or as `testRuntimeOnly`, and the edge table names the
+ * edge, not the configuration.
  */
 abstract class VerifyModuleDependencies : DefaultTask() {
 
@@ -413,6 +423,9 @@ abstract class VerifyModuleDependencies : DefaultTask() {
     @get:Input
     abstract val testModuleDependencies: ListProperty<String>
 
+    @get:Input
+    abstract val testLibraries: ListProperty<String>
+
     @TaskAction
     fun verifyDeclaredDependencies() {
         ModuleDependencyRule(
@@ -421,6 +434,7 @@ abstract class VerifyModuleDependencies : DefaultTask() {
             moduleDependencies = moduleDependencies.get(),
             libraries = libraries.get(),
             testModuleDependencies = testModuleDependencies.get(),
+            testLibraries = testLibraries.get(),
         ).verify()
     }
 }
@@ -1092,6 +1106,7 @@ class ModuleDependencyFixture(
     val moduleDependencies: List<String>,
     val libraries: List<String>,
     val testModuleDependencies: List<String>,
+    val testLibraries: List<String>,
     val expectedRefusal: String?,
 )
 
@@ -1116,6 +1131,7 @@ val moduleDependencyFixtures = listOf(
         moduleDependencies = listOf("cli"),
         libraries = listOf(),
         testModuleDependencies = listOf(),
+        testLibraries = listOf(),
         expectedRefusal = "core declares a dependency on cli, which its edge row does not allow; the row allows contract",
     ),
     ModuleDependencyFixture(
@@ -1125,6 +1141,7 @@ val moduleDependencyFixtures = listOf(
         moduleDependencies = listOf("contract"),
         libraries = listOf(),
         testModuleDependencies = listOf("cli"),
+        testLibraries = listOf(),
         expectedRefusal = "core declares a dependency on cli, which its edge row does not allow; the row allows contract",
     ),
     ModuleDependencyFixture(
@@ -1134,6 +1151,7 @@ val moduleDependencyFixtures = listOf(
         moduleDependencies = listOf("contract"),
         libraries = listOf(),
         testModuleDependencies = listOf(),
+        testLibraries = listOf(),
         expectedRefusal = null,
     ),
     ModuleDependencyFixture(
@@ -1143,6 +1161,7 @@ val moduleDependencyFixtures = listOf(
         moduleDependencies = listOf(),
         libraries = listOf(),
         testModuleDependencies = listOf("contract"),
+        testLibraries = listOf(),
         expectedRefusal = null,
     ),
     ModuleDependencyFixture(
@@ -1152,7 +1171,18 @@ val moduleDependencyFixtures = listOf(
         moduleDependencies = listOf("contract"),
         libraries = listOf("org.springframework:spring-context"),
         testModuleDependencies = listOf(),
+        testLibraries = listOf(),
         expectedRefusal = "core declares org.springframework:spring-context, which is Spring; the core carries no framework",
+    ),
+    ModuleDependencyFixture(
+        what = "the core declares Spring in its test scope",
+        module = "core",
+        allowedEdges = listOf("contract"),
+        moduleDependencies = listOf("contract"),
+        libraries = listOf(),
+        testModuleDependencies = listOf(),
+        testLibraries = listOf("org.springframework:spring-test"),
+        expectedRefusal = "core declares org.springframework:spring-test, which is Spring; the core carries no framework",
     ),
     ModuleDependencyFixture(
         what = "the core declares JavaFX",
@@ -1161,6 +1191,7 @@ val moduleDependencyFixtures = listOf(
         moduleDependencies = listOf("contract"),
         libraries = listOf("org.openjfx:javafx-controls"),
         testModuleDependencies = listOf(),
+        testLibraries = listOf(),
         expectedRefusal = "core declares org.openjfx:javafx-controls, which is JavaFX; the core carries no framework",
     ),
     ModuleDependencyFixture(
@@ -1170,6 +1201,7 @@ val moduleDependencyFixtures = listOf(
         moduleDependencies = listOf("contract", "wiring"),
         libraries = listOf("io.modelcontextprotocol.sdk:mcp"),
         testModuleDependencies = listOf(),
+        testLibraries = listOf(),
         expectedRefusal = null,
     ),
 )
@@ -1214,6 +1246,7 @@ class DependencyRuleFixtures(
                     moduleDependencies = fixture.moduleDependencies,
                     libraries = fixture.libraries,
                     testModuleDependencies = fixture.testModuleDependencies,
+                    testLibraries = fixture.testLibraries,
                 ),
             )
         } + runtimeClasspathFixtures.map { fixture ->
