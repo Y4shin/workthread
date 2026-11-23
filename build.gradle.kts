@@ -1350,7 +1350,34 @@ class CiPipelineRule(
         checkToolchain(body, violations)
         checkPipelineSteps(body, violations)
         checkUploadedImages(body, violations)
+        checkRunPolicy(body, violations)
         return violations
+    }
+
+    /**
+     * When the pipeline runs, what it is allowed to do, and what happens to a run
+     * a newer commit supersedes. Read-only permissions are the default a pipeline
+     * should have to argue its way out of, and a superseded run that keeps
+     * running burns minutes for a result nobody will read.
+     */
+    private fun checkRunPolicy(body: List<String>, violations: MutableList<String>) {
+        if (body.none { line -> line.contains("pull_request:") }) {
+            violations.add("the pipeline is not triggered by a pull request")
+        }
+        if (body.none { line -> line.trim() == "push:" } || body.none { line -> line.contains("branches:") && line.contains("main") }) {
+            violations.add("the pipeline is not triggered by a push to main")
+        }
+        if (body.none { line -> line.contains("workflow_dispatch:") }) {
+            violations.add("the pipeline is not triggered by workflow_dispatch; a rerun must be possible without a commit")
+        }
+        if (body.none { line -> line.trim() == "concurrency:" }) {
+            violations.add("the pipeline has no concurrency group; a superseded run keeps burning runner minutes")
+        } else if (body.none { line -> line.contains("cancel-in-progress: true") }) {
+            violations.add("the pipeline's concurrency group does not set cancel-in-progress: true; a superseded run keeps burning runner minutes")
+        }
+        if (body.none { line -> line.contains("contents: read") } || body.any { line -> WRITE_PERMISSION.containsMatchIn(line) }) {
+            violations.add("the pipeline's permissions are not read-only; the build needs contents: read and nothing more")
+        }
     }
 
     /**
@@ -1458,6 +1485,7 @@ class CiPipelineRule(
         val RUNNER_LABELS = listOf("ubuntu-24.04", "macos-26", "windows-2025")
         val FLOATING_RUNNER_LABEL = Regex("(ubuntu|macos|windows)-latest")
         val PINNED_JDK = Regex("java-version:\\s*['\"]?21\\.0\\.13['\"]?")
+        val WRITE_PERMISSION = Regex("permissions:\\s*write|:\\s*write")
     }
 }
 
@@ -1640,6 +1668,40 @@ val ciPipelineFixtures = listOf(
             "          if-no-files-found: warn",
         ),
         expectedRefusal = "the artifact upload tolerates a missing image; if-no-files-found: error fails the leg instead of shipping nothing",
+    ),
+    CiPipelineFixture(
+        what = "no pull request trigger",
+        lines = listOf("on:", "  push:", "    branches: [main]", "  workflow_dispatch:"),
+        expectedRefusal = "the pipeline is not triggered by a pull request",
+    ),
+    CiPipelineFixture(
+        what = "no push to the main branch",
+        lines = listOf("on:", "  pull_request:", "  workflow_dispatch:"),
+        expectedRefusal = "the pipeline is not triggered by a push to main",
+    ),
+    CiPipelineFixture(
+        what = "no manual dispatch",
+        lines = listOf("on:", "  push:", "    branches: [main]", "  pull_request:"),
+        expectedRefusal = "the pipeline is not triggered by workflow_dispatch; a rerun must be possible without a commit",
+    ),
+    CiPipelineFixture(
+        what = "no concurrency group",
+        lines = listOf("permissions:", "  contents: read"),
+        expectedRefusal = "the pipeline has no concurrency group; a superseded run keeps burning runner minutes",
+    ),
+    CiPipelineFixture(
+        what = "a superseded run is not cancelled",
+        lines = listOf(
+            "concurrency:",
+            "  group: \${{ github.workflow }}-\${{ github.ref }}",
+            "  cancel-in-progress: false",
+        ),
+        expectedRefusal = "the pipeline's concurrency group does not set cancel-in-progress: true; a superseded run keeps burning runner minutes",
+    ),
+    CiPipelineFixture(
+        what = "the permissions are not read-only",
+        lines = listOf("permissions: write-all"),
+        expectedRefusal = "the pipeline's permissions are not read-only; the build needs contents: read and nothing more",
     ),
 )
 

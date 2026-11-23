@@ -3,6 +3,25 @@
 # JavaFX plugin sees is the OS the image is for.
 name: ci
 
+# Every push to main, every pull request, and a manual run: a patch has to meet
+# the pipeline, and a rerun must not need a commit.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only. The build reads the checkout, and the artifact upload uses the run's
+# own token; the first run is what confirms it needs nothing wider.
+permissions:
+  contents: read
+
+# A newer commit supersedes the run before it, and the superseded leg stops
+# rather than burning runner minutes for a result nobody reads.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     # One leg per platform, and one leg failing does not cancel the others: the
