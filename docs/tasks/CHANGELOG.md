@@ -9,6 +9,15 @@ title: Task Changelog
 
 
 
+
+## 2026-11-23, Start 0.1.0 and the contract API snapshot (version-and-api-snapshot)
+
+The version is 0.1.0 from one property, and three enforcers read it: every jar carries it in its manifest, the client's window label renders it from a generated resource, and `verifyVersion` refuses a jar or a source file that reports another number. `check` now compares `contract`'s exported surface against a committed snapshot.
+
+Decisions: the snapshot holds packages plus public and protected types and members, and it compares one-directionally, so an addition passes and is recorded by running `generateContractApiSnapshot`; the window's label is no longer a typed literal, which closes the coupling the image ticket forwarded.
+
+Outcome: a removed or reshaped export fails `check` with the element name and both shapes, fourteen fixtures prove the failure paths, `docs/releasing.md` records who tags and when, no tag was created, and `./gradlew clean build` is green with 74 executed tasks.
+
 ## 2026-11-23, Ship the empty window as a jlink image (client-image)
 
 `./gradlew :client:jlink` now builds a runtime image whose launcher opens one empty window: title `workthread`, 1024x768, one centred label reading `workthread 0.1.0`. The client's placeholder became the real JavaFX `Application` subclass, and its descriptor gained `requires javafx.controls`.
