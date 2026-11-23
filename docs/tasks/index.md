@@ -20,8 +20,7 @@ title: docs/tasks
 - 10-client-shell
 - 11-client-views
 - 12-tray-surface
-- planner-v1
 
 ## Archived
 
-(none)
+- planner-v1
