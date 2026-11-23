@@ -3,7 +3,7 @@ type: task
 subtype: grilling
 title: Settle the non-goals, the non-negotiable facts, and the success test for the work store
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 
@@ -84,3 +84,48 @@ That is 61 rows.
 Second in the build order, blocked by `01-scaffolding`, release 0.1 Capture. Its
 successor is `03-cli-basics`. The full order is the table under `## Effort order`
 in the parent's architecture document.
+
+## Notes
+
+Settled in one grilling session, two rounds. The operator's answers are recorded in their terms.
+
+### The record model is built here, not deferred
+
+The effort defines every stored record kind in `contract` and creates every table in the first migration. The operator's reason: where the parent already decided a record's shape, there is nothing left to design, so deferring it only moves decided work to the tail of the effort chain. If a shape changes later, a migration is the normal path, not a problem.
+
+The kinds are the task, project, dependency, note, time entry, session, time off, settings, notice, pending operation, and **override**. The override is a tenth kind the parent's list omitted, settled as its own record with a target, an affected rule (dependency order, capacity for the current day, or ordering), the surface and whether a human or an agent drove it, an instant, and an optional reason.
+
+Rejected: the narrow reading, which would have built only the task, project, dependency, note, and settings records and added the rest through later migrations. The operator rejected it because it defers decided work rather than settling it.
+
+### Documentation moves with the code
+
+The operator's condition on the override: the repository must never hold two contradictory counts. So the tenth kind is recorded in this effort's architecture document and in the requirements register in the same write as the schema. The architecture document of the parent effort counts nine bullets because it bundles task and project together and omits the override; the new document states the eleven kinds explicitly. A register row that still says nine is superseded by a new row, never edited, because the register records what was settled and when.
+
+Approved to support this: `docs/v1/requirements-lookup.py` gains a source-file lookup, since the two lookups it offers (by effort, by id) cannot list the rows that cite a given file.
+
+### The one display formatter lives here
+
+`contract` gains the single identifier formatter, rendering `TSK-0001` and `PRJ-0001`. Reason: register row MAP-031 is this effort's obligation, and a formatter written later by the CLI effort invites each surface to spell identifiers its own way. Rejected: leaving it to `03-cli-basics`.
+
+### The store test seam
+
+One test-only database builder owns the mode. A test asks for a real database file in a temporary directory or an in-process database. A build property overrides the request for the whole suite onto real files, and the override wins over what the test asked for, so the resolution lives in the builder and never in the test. One test always runs on a real file, so durability across an unclean close and the owner lock keep a safety net. A build check refuses a test that constructs the store or its database directly, so every store test goes through the builder.
+
+Rejected: real files for every test, which makes the inner loop slow; and in-process by default with the committed pipeline opting into real files, which edits a file that `verifyCiWorkflow` checks and leaves the less faithful mode as the default.
+
+### The floor, and why it was amended
+
+The operator caught that the drafted success test could be satisfied by a store that round-trips only tasks and projects. The floor now states the breadth explicitly: the success test says every kind reads back unchanged, and the non-negotiable facts name all eleven kinds and say that a kind `ForStoringWork` does not carry is not stored. Non-goals exclude every surface: no command, MCP tool, API endpoint, window, or tray; no planner, ordering, forecast, or recalculation; no export, import, backup restore, or purge; no attachments; no daemon or API listener; no operation-log reader.
+
+**Success test.** Every record kind this effort defines reads back unchanged through `ForStoringWork` after the process is killed, every change since a cursor is returned exactly once, and a second process is refused the data directory.
+
+### Consequences for dependent efforts
+
+- `03-cli-basics` finds the time entry and session tables already present and adds only its use cases.
+- `08-mcp-agent-interface` finds the pending operation table already present.
+- A later effort that needs a new field asks for a migration; it does not add a column by hand.
+- Every later effort's store tests go through the same builder, so a change to the store's test mode is one change.
+
+### Left open, and promoted to tasks
+
+No fog remains. Three questions were precise enough to become planning tasks: the facts the SQLite driver and the engine give for the mechanisms this effort must prove (`sqlite-mechanics`), the concrete storage shape per kind and for the two logs (`schema-shape`), and the operation set of `ForStoringWork` including `snapshotFor` (`store-contract`).
