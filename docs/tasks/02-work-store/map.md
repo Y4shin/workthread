@@ -60,8 +60,45 @@ it in later efforts.
 **Success test:** Every record kind this effort defines reads back unchanged through `ForStoringWork` after the process is killed, every change since a cursor is returned exactly once, and a second process is refused the data directory.
 
 - The kinds are the task, project, dependency, note, time entry, session, time
-  off, settings, notice, pending operation, and override. `ForStoringWork`
-  carries all eleven, and a kind the port does not carry is not stored.
+  off, notice, pending operation, and override: ten. Settings are not a stored
+  kind. They live in a settings file behind their own port, settled by
+  `settings-storage`, and a kind `ForStoringWork` does not carry is not stored.
+- One central `record` table holds `(id, type)`, the type under a CHECK over the
+  ten kinds and the id from one shared `AUTOINCREMENT` sequence. Every kind table
+  carries the same id, a composite foreign key on `(id, type)` into the central
+  table, a CHECK that its own type is its kind, its own display number, and its
+  own columns. The change log and the operation log reach a record through the
+  same key.
+- The identifier a surface sees is the per-kind display number rendered by the
+  one formatter, allocated from a per-kind counter inside the write transaction.
+  The internal record id never crosses the port. Neither number is ever reused,
+  and a test asserts that a removed record's identifiers do not come back.
+- Removal is soft in every kind: `removed_at` on the kind table, every read
+  filtering it, and the central record row persisting so every foreign key stays
+  valid. Per-date uniqueness is a partial unique index over the rows that are not
+  removed. Nothing is hard-deleted in this effort, because purge is out of scope.
+- Instants are `INTEGER` epoch milliseconds in UTC, local dates are `TEXT` in
+  `YYYY-MM-DD`, durations are `INTEGER` minutes, booleans are `INTEGER` 0 or 1
+  with a CHECK, enumerations are `TEXT` with a CHECK naming the allowed values,
+  and JSON text appears only in the pending operation payload.
+- Every set-valued member is a row in its own table with a foreign key to its
+  owner. There is no join table, because nothing in these kinds is many-to-many.
+- The change log is the feed: one minimal row per changed record carrying its
+  kind, its record key, create or update or remove, the transaction, the surface,
+  the actor, the instant, and the display number, so a feed reader never joins.
+  The operation log is history: one row per operation with its name, surface,
+  actor, instant, outcome, before-image for removed content, and service
+  lifecycle events such as the stop instant. Both are written in the transaction
+  of the port call they belong to.
+- A transaction column holds an integer allocated once per port call from a
+  counter row inside the same transaction, so a cursor read returns one call's
+  rows as one group.
+- The cursor is a version prefix plus the base64url encoding of the eight-byte
+  sequence position. A token with an unknown prefix, a wrong length, or a bad
+  encoding is refused with a result case and never guessed at.
+- A task in `ready` requires a positive estimate, enforced by a row CHECK. An
+  override carries two typed nullable target columns, a task id and a date, with
+  a CHECK that exactly one is set.
 - The port has one adapter-implemented write method taking an ordered change
   set, and every per-kind operation is a default method that builds a one-element
   change set and delegates to it. One call opens one transaction, writes one
@@ -85,20 +122,16 @@ it in later efforts.
   records stay in the core.
 - Nothing framework-shaped or driver-shaped enters `contract`, so the core's own
   tests replace the port with plain collections.
-- The first migration creates the table for every kind in one write, because
-  migrations are forward-only.
-- One transaction is one port call, and the change log row for a change is
-  written in that same transaction.
+- The first migration creates the central table, the ten kind tables, the two
+  logs, and the counters in one write, because migrations are forward-only.
 - The override is an explicit, confirmed, recorded exception carrying a target,
-  an affected rule of dependency order, capacity for the current day, or
-  ordering, the surface it came from and whether a human or an agent drove it,
-  an instant, and an optional reason.
+  an affected rule of dependency order, capacity for the current day, or ordering,
+  the surface it came from and whether a human or an agent drove it, an instant,
+  and an optional reason.
 - A task's stored status is one of inbox, ready, in progress, completed, or
   cancelled. Blocked is derived and never stored, leaving completed clears the
   completion time, and a cancelled or completed task is excluded from
   scheduling.
-- An identifier is never reused and never renumbered, proved by a test that
-  deletes a record and asserts the next identifier is not the deleted one.
 - The one formatter in `contract` renders an identifier as `TSK-0001` or
   `PRJ-0001`, and no surface formats one its own way.
 - Every store test opens its database through the one test-only builder. A real
@@ -106,9 +139,11 @@ it in later efforts.
   overrides the whole suite onto real files, one test always runs on a real
   file, and a build check refuses a test that constructs the store or its
   database directly.
-- The eleven kinds are recorded in this effort's architecture document and in
-  the requirements register in the same write as the schema, and a register row
-  that states nine kinds is superseded rather than edited.
+- The ten kinds and the settings decision are recorded in this effort's
+  architecture document and in the requirements register in the same write as
+  the schema. Register row `T11-012`, whose parenthetical lists settings and
+  timetable inside `ForStoringWork`, and any row stating a different kind count,
+  are superseded rather than edited.
 - The writer connection is opened once, before any statement runs, with the
   pragmas issued as explicit statements in one fixed order outside any
   transaction: `busy_timeout`, `journal_mode = WAL`, `synchronous = FULL`,
@@ -220,6 +255,33 @@ Every row is verified one by one before this effort may close, and the closing t
   function decides from state read before it, and a decision on post-write state
   needs either a callback or a function carried in the set. The function-valued
   case stays documented as the designed extension, with its costs named.
+- The `schema-shape` grilling settled the storage shape of the ten kinds and the
+  two logs, and the full record is in `## Non-negotiable facts` because the
+  migration and the specification are written from it. In outline: `INTEGER`
+  epoch milliseconds for instants, `YYYY-MM-DD` text for dates, `INTEGER`
+  minutes, `INTEGER` 0/1 with a CHECK for booleans, `TEXT` with a CHECK for
+  enumerations, and JSON text only in the pending operation payload; every
+  set-valued member is a row in its own table with a foreign key to its owner
+  and no join table anywhere; one central `record` table holding `(id, type)`
+  with a shared internal sequence, each kind table carrying a composite foreign
+  key to it and its own display number from a per-kind counter; removal is soft
+  in every kind through `removed_at` on the kind table, with the central row
+  persisting so every foreign key holds; a transaction column groups the rows of
+  one port call; the change log is the feed with a minimal row, the operation log
+  is history with before-images and lifecycle events, both written in the same
+  transaction; the cursor is a version prefix plus base64url of the sequence
+  position, refused when unrecognised; and the field list per kind is adopted as
+  preliminary, because a later effort may change a shape through a migration.
+- The `schema-shape` grilling also recorded that settings leave the store: the
+  operator ruled that storing them in a database is wrong, so the business
+  settings live in a separate file behind their own port. The kinds therefore
+  number ten, not eleven, and the settings read and write named in the
+  `store-contract` operation set above no longer apply. The file's format,
+  location, atomic write, and invalid-file behaviour belong to the
+  `settings-storage` grilling, created for it. Register row `T11-012`, whose
+  parenthetical lists settings and timetable inside `ForStoringWork`, is
+  superseded rather than edited; register row `SRC-RULE-DATA-3` still holds,
+  because a file preserves settings across upgrades and restarts.
 
 ## Fog
 
