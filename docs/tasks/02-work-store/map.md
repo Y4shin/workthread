@@ -62,6 +62,29 @@ it in later efforts.
 - The kinds are the task, project, dependency, note, time entry, session, time
   off, settings, notice, pending operation, and override. `ForStoringWork`
   carries all eleven, and a kind the port does not carry is not stored.
+- The port has one adapter-implemented write method taking an ordered change
+  set, and every per-kind operation is a default method that builds a one-element
+  change set and delegates to it. One call opens one transaction, writes one
+  change-log row per change in that transaction, and runs the integrity check
+  once at the end of the set.
+- The change set is pure data. It runs no caller logic between its writes, and
+  the interface stays open to a function-valued change case if a named use case
+  ever needs a decision taken on post-write state.
+- A write returns the stored record inside the monadic result and no cursor. A
+  cursor belongs to the reads: `changesSince`, and `snapshotFor` with a sealed
+  generic query that fixes its own result type.
+- An edit is a per-kind patch record with explicit presence, `Change` for a field
+  that cannot be cleared and `NullableChange` for one that can. A patch that
+  changes nothing writes no column, no change-log row, and returns the current
+  record.
+- A failure the caller must distinguish is a case of the monadic result, never a
+  framework or driver exception. Literal `throw` and `catch` are refused by a
+  build check outside the one wrapper.
+- Integrity is checked at the port on the merged record, with SQLite CHECK
+  constraints, NOT NULL, and foreign keys as the backstop, and rules spanning
+  records stay in the core.
+- Nothing framework-shaped or driver-shaped enters `contract`, so the core's own
+  tests replace the port with plain collections.
 - The first migration creates the table for every kind in one write, because
   migrations are forward-only.
 - One transaction is one port call, and the change log row for a change is
@@ -142,6 +165,61 @@ Every row is verified one by one before this effort may close, and the closing t
   against the pinned jar, the `journal_mode` of a `VACUUM INTO` copy is inferred,
   and the Windows lock release on forced termination is assumed. A spike test
   answers the first two, and the never-reuse rule gets its own test.
+- The `transaction-modeling` research settled how an atomic multi-record write
+  travels through the port, recorded at `docs/research/transaction-modeling.md`:
+  the adapter implements one write method taking an ordered change set, and
+  every per-kind operation is a default method that builds a one-element change
+  set and delegates to it. So one call is one transaction, the deferred
+  integrity check has an end to run at, and no framework type enters `contract`.
+  Rejected on evidence: a callback handing the caller a framework handle, a
+  caller-opened JDBC transaction in `contract`, a unit-of-work object, and a
+  lambda taking the port itself, each of which either names a framework type in
+  `contract` or makes the core's fake model nesting or a database.
+- The `edit-shape` research settled how a partial edit travels, recorded at
+  `docs/research/edit-shape.md`: a per-kind patch record carrying an explicit
+  presence per field, with `Change<T>` for a value that may not be cleared and
+  `NullableChange<T>` for one that may, so "leave alone", "set", and "clear" are
+  three distinguishable states the compiler can check. A caller holding a whole
+  record calls `replacing(record)`. The sealed either-input the operator
+  proposed is dropped, because `Replace` still needs the read and costs a sealed
+  interface plus two case records per kind. No Java data layer in the trusted set
+  takes a hand-written per-kind diff as its update parameter, so the shape is a
+  composition of recognised pieces rather than a convention; RFC 7396 and the
+  update-mask pattern are its nearest relatives.
+- The `edit-shape` research leaves two choices to the port and one risk to a
+  later effort: whether a patch that changes nothing writes nothing or is
+  refused, whether the identifier travels beside the patch or inside it, and that
+  a JSON request body cannot distinguish an absent member from an explicit null
+  without a custom deserializer, which the API effort must face before it designs
+  a patch body.
+- The `store-contract` grilling settled the port itself, on four rounds of
+  answers and three research notes. It carries per-kind operations, not one
+  verb set, and only the operations a named use case needs: the initial set is
+  task create, edit, read, list; project create, edit, read, list; note append,
+  remove, list; dependency add, remove, list; time entry append, remove, and list
+  by task and by session; session store, read, list by month; time off store,
+  remove, list by month; settings read and write; notice raise, dismiss, list;
+  pending operation record, read, list, delete, and count a failed attempt;
+  override record, read, list; operation log append; and the change feed. Reads
+  are `changesSince(Cursor)` and `snapshotFor(SnapshotQuery<R>, Cursor)`, with
+  the query's result type fixed by its sealed case, and a write returns the
+  stored record with no cursor. A change set is pure data and runs no logic
+  between its writes; the deferred integrity check at the end of the set is what
+  lets two changes that are each invalid alone be applied together, and the
+  interface stays open to a function-valued change case if a use case ever needs
+  a decision on post-write state. Errors are a hand-written monadic result with
+  `map` and `flatMap`, `@CheckReturnValue`, a lint ban on literal `throw` and
+  `catch`, and one wrapper that turns error-prone calls into a result.
+- The `store-contract` grilling settled the tooling scope too: the monadic
+  result type, the errorprone annotations, the lint ban, and the wrapper all land
+  in this effort rather than a later one, so the first code that uses the error
+  channel already obeys the rule.
+- The `change-set-logic` research, written for the mid-set question, recorded at
+  `docs/research/change-set-logic.md`, is what the strict-set answer rests on:
+  the domain literature keeps decisions inside the transaction, a decider
+  function decides from state read before it, and a decision on post-write state
+  needs either a callback or a function carried in the set. The function-valued
+  case stays documented as the designed extension, with its costs named.
 
 ## Fog
 

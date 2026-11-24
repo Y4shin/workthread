@@ -3,7 +3,7 @@ type: task
 subtype: research
 title: How Java ports model atomic multi-record writes and transaction boundaries
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 
@@ -61,3 +61,37 @@ Unresolved points are named, not smoothed over.
 
 `store-contract` item 5 (compound changes), the specification's port section,
 and every later effort whose use case changes two records at once.
+
+## Notes
+
+All five sub-questions answered with primary-source citations and a confidence
+per item. The findings are at `docs/research/transaction-modeling.md`.
+
+The recommendation the port adopts: the adapter implements one write method
+taking an ordered change set, and each per-kind operation is a default method
+that builds a one-element change set and delegates to it. The port therefore
+keeps the per-kind operations `store-contract` chose, while one adapter method
+owns the transaction, the change-log rows, and the end of the deferred integrity
+check.
+
+What the evidence rules out, and why:
+- A callback that hands the caller a framework handle (jOOQ, Jdbi,
+  `TransactionTemplate`, JPA `runInTransaction`) puts a framework type in
+  `contract`, so the core's fake cannot be built without the framework.
+- A caller-opened transaction names `java.sql.Connection` in `contract`, which
+  the map forbids and which turns the fake into a database.
+- Two port calls give two transactions, so a cursor range stops being a set
+  boundary and the deferred check has no end to run at.
+- A unit-of-work object needs the core to carry a mutable object the fake must
+  model; a lambda taking the port itself gives the port a re-entrancy rule.
+- Nested calls join the outer transaction in every shape checked, with savepoints
+  the only partial rollback, and JDBC has no nested begin.
+
+Left for the specification to pin, not decided here: the concrete change records
+one per operation per kind, the rule for a change set that names one record
+twice, the statement that no other port method opens a transaction, and whether
+the deferred integrity check can be asked for explicitly.
+
+The cost at the fake is stated in the note: one method, a staged copy of the
+record map and the log, and a reference swap to publish, with no framework type
+involved.

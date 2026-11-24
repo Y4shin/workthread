@@ -3,7 +3,7 @@ type: task
 subtype: grilling
 title: Settle the operation set of ForStoringWork and the shape of snapshotFor
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 
@@ -196,3 +196,98 @@ outside the wrapper; and the existing build checks are the precedent for it.
 - Which concrete operations exist per kind. This follows from "only named use
   cases" once the two research results are in, because the named use cases are
   what the specification must enumerate.
+
+### 11. Rounds 4 and 5: the two deferred items, answered by research
+
+The two items deferred after round 3 are settled. Both were answered from
+`docs/research/transaction-modeling.md`, `docs/research/edit-shape.md`, and
+`docs/research/change-set-logic.md`, all cited to primary sources.
+
+**How an atomic multi-record write travels (`transaction-modeling`).** Adopted:
+the adapter implements one write method taking an ordered change set, and every
+per-kind operation is a default method that builds a one-element change set and
+delegates to it. The per-kind methods you chose in round 1 survive; the shared
+generic path you asked for is that one method. Rejected on evidence: a callback
+that hands the caller a framework handle (jOOQ, Jdbi, Spring's transaction
+template, JPA `runInTransaction`), a caller-opened JDBC transaction (it names
+`java.sql.Connection` in `contract` and turns the core's fake into a database),
+a unit-of-work object, and a lambda taking the port itself.
+
+**What a change set does about logic between its writes.** Settled: the set is
+pure data and runs no caller logic between writes. The chicken-and-egg case you
+raised is covered by the deferred integrity check at the end of the set, so two
+writes that are each invalid alone and valid together pass. A conditional change
+carries an expected-state precondition; a decision that needs more is a rule the
+core evaluates from a snapshot read. Recorded deliberately, in your words: this
+choice is for simplicity for now, and the interface stays open to new approaches
+if a use case needs one later. The research's function-valued change case is
+recorded as the designed extension, with its costs: the change-log rows stop
+being knowable before the call, the fake can no longer be a single map swap, and
+`contract` would carry a function. The other shapes the research names, and that
+were rejected, are a second read-modify-write method and a broader decider
+shape.
+
+**How a partial edit travels (`edit-shape`).** Adopted: a per-kind patch record
+with one presence value per field. `Change<T>` has `Keep` and `Set` for a field
+that cannot be cleared, `NullableChange<T>` adds `Clear` for a field that can,
+and the compiler refuses a merge that forgets `Clear`. A caller holding a whole
+record calls `replacing(record)`. The merge is a pure function in `contract`, so
+the fake and the adapter cannot disagree about what a patch means. Your sealed
+either-input is dropped: the research shows the `Replace` case still needs the
+same read the patch needs, and it costs a sealed interface plus two case records
+per kind. No version column and no expected-state parameter until a named use
+case needs a conditional transition.
+
+**What the store does with a patch that changes nothing.** It writes no column
+and no change-log row, and returns the current record.
+
+### 12. The initial operation set, confirmed
+
+The port carries exactly these operations in this effort, one default method per
+line, all delegating to the one write method or reading through the change feed:
+
+- task: create, edit, read one, list
+- project: create, edit, read one, list
+- note: append, remove, list for a task
+- dependency: add, remove, list for a task
+- time entry: append, remove, list for a task, list for a session
+- session: store, read one, list for a month
+- time off: store, remove, list for a month
+- settings: read, write
+- notice: raise, dismiss, list
+- pending operation: record, read one, list, delete, count a failed attempt
+- override: record, read one, list
+- operation log: append a lifecycle event
+- change feed: changes since a cursor, snapshot for a query
+
+Later efforts add an operation when their own use case lands. Rejected: a
+narrower set holding only the kinds the first two consuming efforts use, because
+the success test requires every kind to read back; and the uniform four
+operations per kind, which is the frontloading you ruled out.
+
+### Record of what the port is, at the close of this grilling
+
+- One write method taking an ordered change set; one transaction per call; one
+  change-log row per change, written in that transaction; the integrity check
+  once at the end of the set.
+- Per-kind default methods over it, the initial set named above, and no
+  operation without a named use case.
+- Reads: `changesSince(Cursor)` and `snapshotFor(SnapshotQuery<R>, Cursor)`,
+  both returning the monadic result and a fresh cursor.
+- Writes return the stored record inside the monadic result, with no cursor.
+- Edits are per-kind patch records with explicit presence; a no-op patch writes
+  nothing.
+- Integrity is checked at the port, on the merged record, with SQLite
+  constraints as the backstop, and rules spanning records stay in the core.
+- The error channel is a hand-written monadic result type, with
+  `@CheckReturnValue` from errorprone, a lint ban on literal `throw` and
+  `catch`, and one wrapper that turns error-prone calls into a result and panics
+  on an unexpected throw. All of that lands in this effort.
+- Nothing framework-shaped or driver-shaped enters `contract`, so the core's
+  fake replaces the port with plain collections.
+
+Still to be decided by later phases, not by this grilling: the concrete change
+records and patch records per kind (the specification), the rule for a change
+set that names one record twice, the schema's column shapes (`schema-shape`), and
+the JSON side of the three-state patch carrier, which the API effort must face
+before it designs a request body.

@@ -3,7 +3,7 @@ type: task
 subtype: research
 title: "How a Java port carries a partial edit: whole record, per-kind diff, or both"
 status: stable
-workflow_state: ready
+workflow_state: done
 blocked_by: []
 ---
 
@@ -69,3 +69,43 @@ plainly. Unresolved points are named, not smoothed over.
 `store-contract` item 8, the specification's port and record sections, every
 later effort's edit commands, and the API surface that will mirror the same
 shape as a patch request body.
+
+## Notes
+
+All six sub-questions answered with primary-source citations and a confidence
+per item. The findings are at `docs/research/edit-shape.md`.
+
+The verdict on the operator's proposal: a per-kind `XDiff` with wither methods is
+not a pattern any trusted Java data layer uses as an update parameter. Whole-
+record write is the convention; partial edit appears as dirty tracking on a
+record the layer loaded itself, a narrow hand-written statement, or an HTTP patch
+applied at the edge. The proposed pieces are each recognised (a wither is a
+copy-with, a mutable diff is a builder, and the closest named pattern is an
+update mask), but the composition is an invention.
+
+The real problem the proposal meets and the note settles: three states per field
+("leave alone", "set a value", "set nothing"), which a nullable field cannot
+express. The recommendation carries them in two generic sealed interfaces,
+`Change<T>` with Keep and Set, and `NullableChange<T>` with Keep, Set, and Clear,
+so an unhandled Clear is a compile error rather than a silent null.
+
+Recommendation: adopt the per-kind patch record as the only edit value;
+`NotePatch.replacing(note)` serves a caller that holds a whole record; drop the
+sealed either-input, because its Replace case still needs the read the patch
+needs anyway and it costs a sealed interface plus two case records per kind. The
+merge is a pure function in `contract`, so the fake and the adapter cannot
+disagree about what a patch means. No version column until a named use case needs
+a conditional transition.
+
+Left for `store-contract` to settle: whether a patch that changes nothing writes
+nothing or is refused, and whether the identity is a parameter beside the patch
+or a component of it.
+
+Risk carried to a later effort, not settled here: a JSON request body cannot
+distinguish an absent member from an explicit null with a plain record, so the
+API effort needs a custom deserializer or a presence-aware mapper before it
+designs a patch request body.
+
+The findings were written from the researcher's reply rather than by the
+researcher itself; the run replied with the document inline and left no file, so
+the parent wrote it verbatim to the agreed path.
